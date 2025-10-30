@@ -1,4 +1,4 @@
-import { E as EventHandler, S as SelectorEngine, d as defineJQueryPlugin, B as BaseComponent, r as reflow, c as getElement } from './dom.js?5.3.2';
+import { E as EventHandler, S as SelectorEngine, d as defineJQueryPlugin, B as BaseComponent, r as reflow, c as getElement } from './dom.js?5.3.8';
 
 /**
  * --------------------------------------------------------------------------
@@ -6,6 +6,7 @@ import { E as EventHandler, S as SelectorEngine, d as defineJQueryPlugin, B as B
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -153,12 +154,11 @@ class Collapse extends BaseComponent {
     this._element.style[dimension] = '';
     this._queueCallback(complete, this._element, true);
   }
-  _isShown() {
-    let element = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : this._element;
-    return element.classList.contains(CLASS_NAME_SHOW);
-  }
 
   // Private
+  _isShown(element = this._element) {
+    return element.classList.contains(CLASS_NAME_SHOW);
+  }
   _configAfterMerge(config) {
     config.toggle = Boolean(config.toggle); // Coerce string values
     config.parent = getElement(config.parent);

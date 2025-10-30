@@ -199,7 +199,7 @@
       if (!this.select) {
         throw new Error('Simple color field requires a select element');
       }
-      this.options = [].slice.call(this.select.querySelectorAll('option'));
+      this.options = this.select.querySelectorAll('option');
       this.select.classList.add('hidden');
 
       // Build the pop up
@@ -238,7 +238,7 @@
       if (clss) {
         this.icon.setAttribute('class', clss);
       }
-      const uniqueId = `simple-color-${Math.random().toString(36).substr(2, 10)}`;
+      const uniqueId = `simple-color-${Math.random().toString(36).substring(2, 12)}`;
       this.icon.setAttribute('type', 'button');
       this.icon.setAttribute('tabindex', '0');
       this.icon.style.backgroundColor = color;
@@ -372,7 +372,6 @@
     }
 
     // Prevents the mousedown event from "eating" the click event.
-    // eslint-disable-next-line class-methods-use-this
     mousedown(e) {
       e.stopPropagation();
       e.preventDefault();
@@ -384,10 +383,7 @@
         const tmpValue = value.split('');
         newValue = tmpValue[0] + tmpValue[1] + tmpValue[1] + tmpValue[2] + tmpValue[2] + tmpValue[3] + tmpValue[3];
       }
-
-      // eslint-disable-next-line no-restricted-syntax
       for (const color in colorNames) {
-        // eslint-disable-next-line no-prototype-builtins
         if (colorNames.hasOwnProperty(color) && newValue.toLowerCase() === colorNames[color]) {
           return color;
         }
@@ -399,7 +395,6 @@
      * Converts a RGB color to its hexadecimal value.
      * See http://stackoverflow.com/questions/1740700/get-hex-value-rather-than-rgb-value-using-$
      */
-    // eslint-disable-next-line class-methods-use-this
     rgb2hex(rgb) {
       const hex = x => `0${parseInt(x, 10).toString(16)}`.slice(-2);
       const matches = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);

@@ -105,7 +105,7 @@ class JoomlaDialog extends HTMLElement {
     this.popupType = this.getAttribute('type') || 'inline';
     this.textHeader = this.getAttribute('text-header') || '';
     this.iconHeader = '';
-    this.textClose = 'Close';
+    this.textClose = Joomla.Text._('JCLOSE', 'Close');
     this.popupContent = '';
     this.src = this.getAttribute('src') || '';
     this.popupButtons = [];
@@ -116,6 +116,8 @@ class JoomlaDialog extends HTMLElement {
     this.preferredParent = null;
     // @internal. Parent of the popupContent for cases when it is HTMLElement. Need for recovery on destroy().
     this.popupContentSrcLocation = null;
+    // @internal. Hold properties addressed directly to <dialog> element, like "aria-".
+    this.dialogProps = {};
     if (!config) return;
 
     // Check configurable properties
@@ -124,8 +126,24 @@ class JoomlaDialog extends HTMLElement {
         this[key] = config[key];
       }
     });
+
+    // Check for properties which should be applied to the <dialog> not to the <JoomlaDialog>, like "aria-".
+    ['ariaLabelledby', 'ariaLabel'].forEach(key => {
+      if (config[key] !== undefined) {
+        this.dialogProps[key] = config[key];
+      }
+    });
+
+    // Check class name
     if (config.className) {
       this.classList.add(...config.className.split(' '));
+    }
+
+    // Check dataset properties
+    if (config.data) {
+      Object.entries(config.data).forEach(([k, v]) => {
+        this.dataset[k] = v;
+      });
     }
   }
 
@@ -181,6 +199,11 @@ class JoomlaDialog extends HTMLElement {
     this.dialog.addEventListener('close', onClose);
     this.appendChild(this.dialog);
 
+    // Apply dialog properties if any
+    Object.entries(this.dialogProps).forEach(([k, v]) => {
+      this.dialog[k] = v;
+    });
+
     // Get template parts
     this.popupTmplH = this.dialog.querySelector('.joomla-dialog-header');
     this.popupTmplB = this.dialog.querySelector('.joomla-dialog-body');
@@ -201,6 +224,11 @@ class JoomlaDialog extends HTMLElement {
         i.classList.add('header-icon');
         i.classList.add(...this.iconHeader.split(' '));
         this.popupTmplH.insertAdjacentElement('afterbegin', i);
+      }
+
+      // Set aria-label if it is still missing
+      if (!this.dialog.ariaLabel) {
+        this.dialog.ariaLabel = this.textHeader;
       }
     }
 

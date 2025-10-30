@@ -37,7 +37,7 @@ class ProfilesModel extends ListModel
 	 * @since   9.0.0
 	 *
 	 */
-	public function __construct($config = [], MVCFactoryInterface $factory = null)
+	public function __construct($config = [], ?MVCFactoryInterface $factory = null)
 	{
 		if (empty($config['filter_fields']))
 		{

@@ -8,9 +8,9 @@
 <extension type="package" method="upgrade">
     <name>pkg_akeebabackup</name>
     <author>Nicholas K. Dionysopoulos</author>
-    <creationDate>2025-09-01</creationDate>
+    <creationDate>2025-10-13</creationDate>
     <packagename>akeebabackup</packagename>
-    <version>10.0.6</version>
+    <version>10.1.0</version>
     <url>https://www.akeeba.com</url>
     <packager>Akeeba Ltd</packager>
     <packagerurl>https://www.akeeba.com</packagerurl>

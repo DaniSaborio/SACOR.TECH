@@ -559,7 +559,11 @@ trait WebPushModelTrait
 		// Reset ComponentHelper's cache
 		$refClass = new \ReflectionClass(ComponentHelper::class);
 		$refProp  = $refClass->getProperty('components');
-		$refProp->setAccessible(true);
+
+		if (version_compare(PHP_VERSION, '8.1.0', 'lt'))
+		{
+			$refProp->setAccessible(true);
+		}
 
 		if (version_compare(PHP_VERSION, '8.3.0', 'ge'))
 		{

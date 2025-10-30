@@ -252,7 +252,12 @@ class Joomla
 		if ((class_exists(PdoDriver::class) && ($db instanceof PdoDriver)) && $refDriver->hasProperty('options'))
 		{
 			$refOptions = $refDriver->getProperty('options');
-			$refOptions->setAccessible(true);
+
+			if (version_compare(PHP_VERSION, '8.1.0', 'lt'))
+			{
+				$refOptions->setAccessible(true);
+			}
+
 			$options = $refOptions->getValue($db);
 			$options = is_array($options) ? $options : [];
 
@@ -293,18 +298,22 @@ class Joomla
 		$classNames = class_parents($db);
 		array_unshift($classNames, get_class($db));
 
-		$isMySQLi = array_reduce($classNames, function (bool $carry, string $className) {
+		$isMySQLi = array_reduce(
+			$classNames, function (bool $carry, string $className) {
 			return $carry || (stripos($className, 'mysqli') !== false);
-		}, false);
+		}, false
+		);
 
 		if ($isMySQLi)
 		{
 			return 'mysqli';
 		}
 
-		$isPdoMySQL = array_reduce($classNames, function (bool $carry, string $className) {
+		$isPdoMySQL = array_reduce(
+			$classNames, function (bool $carry, string $className) {
 			return $carry || (stripos($className, 'pdomysql') !== false);
-		}, false);
+		}, false
+		);
 
 		if ($isPdoMySQL)
 		{

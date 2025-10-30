@@ -32,6 +32,12 @@ class StackActionlogs extends Base
 			'#__action_logs',
 		];
 
+		// This filter only applies to the main site database.
+		if ($root !== '[SITEDB]')
+		{
+			return false;
+		}
+
 		// Is it one of the blacklisted tables?
 		if (in_array($test, $excluded))
 		{

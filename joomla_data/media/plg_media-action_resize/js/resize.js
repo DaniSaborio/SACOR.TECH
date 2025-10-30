@@ -14,7 +14,7 @@ const resize = (width, height, image) => {
   canvas.getContext('2d').drawImage(image, 0, 0, width, height);
 
   // The format
-  const format = Joomla.MediaManager.Edit.original.extension === 'jpg' ? 'jpeg' : Joomla.MediaManager.Edit.original.extension;
+  const format = Joomla.MediaManager.Edit.original.extension.toLowerCase() === 'jpg' ? 'jpeg' : Joomla.MediaManager.Edit.original.extension.toLowerCase();
 
   // The quality
   const quality = formElements.resizeQuality.value;
@@ -76,7 +76,7 @@ window.addEventListener('media-manager-edit-init', () => {
         resolve();
       });
     },
-    Deactivate( /* image */
+    Deactivate(/* image */
     ) {
       return new Promise((resolve /* , reject */) => {
         resolve();

@@ -26,6 +26,10 @@ class Tag {
     */
     constructor(
     /**
+    The optional name of the base tag @internal
+    */
+    name, 
+    /**
     The set of this tag and all its parent tags, starting with
     this one itself and sorted in order of decreasing specificity.
     */
@@ -39,6 +43,7 @@ class Tag {
     The modifiers applied to this.base @internal
     */
     modified) {
+        this.name = name;
         this.set = set;
         this.base = base;
         this.modified = modified;
@@ -47,17 +52,20 @@ class Tag {
         */
         this.id = nextTagID++;
     }
-    /**
-    Define a new tag. If `parent` is given, the tag is treated as a
-    sub-tag of that parent, and
-    [highlighters](#highlight.tagHighlighter) that don't mention
-    this tag will try to fall back to the parent tag (or grandparent
-    tag, etc).
-    */
-    static define(parent) {
+    toString() {
+        let { name } = this;
+        for (let mod of this.modified)
+            if (mod.name)
+                name = `${mod.name}(${name})`;
+        return name;
+    }
+    static define(nameOrParent, parent) {
+        let name = typeof nameOrParent == "string" ? nameOrParent : "?";
+        if (nameOrParent instanceof Tag)
+            parent = nameOrParent;
         if (parent === null || parent === void 0 ? void 0 : parent.base)
             throw new Error("Can not derive from a modified tag");
-        let tag = new Tag([], null, []);
+        let tag = new Tag(name, [], null, []);
         tag.set.push(tag);
         if (parent)
             for (let t of parent.set)
@@ -76,8 +84,8 @@ class Tag {
     example `m1(m2(m3(t1)))` is a subtype of `m1(m2(t1))`,
     `m1(m3(t1)`, and so on.
     */
-    static defineModifier() {
-        let mod = new Modifier;
+    static defineModifier(name) {
+        let mod = new Modifier(name);
         return (tag) => {
             if (tag.modified.indexOf(mod) > -1)
                 return tag;
@@ -87,7 +95,8 @@ class Tag {
 }
 let nextModifierID = 0;
 class Modifier {
-    constructor() {
+    constructor(name) {
+        this.name = name;
         this.instances = [];
         this.id = nextModifierID++;
     }
@@ -97,7 +106,7 @@ class Modifier {
         let exists = mods[0].instances.find(t => t.base == base && sameArray(mods, t.modified));
         if (exists)
             return exists;
-        let set = [], tag = new Tag(set, base, mods);
+        let set = [], tag = new Tag(base.name, set, base, mods);
         for (let m of mods)
             m.instances.push(tag);
         let configs = powerSet(mods);
@@ -179,10 +188,10 @@ function styleTags(spec) {
             tags = [tags];
         for (let part of prop.split(" "))
             if (part) {
-                let pieces = [], mode = 2 /* Normal */, rest = part;
+                let pieces = [], mode = 2 /* Mode.Normal */, rest = part;
                 for (let pos = 0;;) {
                     if (rest == "..." && pos > 0 && pos + 3 == part.length) {
-                        mode = 1 /* Inherit */;
+                        mode = 1 /* Mode.Inherit */;
                         break;
                     }
                     let m = /^"(?:[^"\\]|\\.)*?"|[^\/!]+/.exec(rest);
@@ -194,7 +203,7 @@ function styleTags(spec) {
                         break;
                     let next = part[pos++];
                     if (pos == part.length && next == "!") {
-                        mode = 0 /* Opaque */;
+                        mode = 0 /* Mode.Opaque */;
                         break;
                     }
                     if (next != "/")
@@ -218,8 +227,8 @@ class Rule {
         this.context = context;
         this.next = next;
     }
-    get opaque() { return this.mode == 0 /* Opaque */; }
-    get inherit() { return this.mode == 1 /* Inherit */; }
+    get opaque() { return this.mode == 0 /* Mode.Opaque */; }
+    get inherit() { return this.mode == 1 /* Mode.Inherit */; }
     sort(other) {
         if (!other || other.depth < this.depth) {
             this.next = other;
@@ -230,7 +239,7 @@ class Rule {
     }
     get depth() { return this.context ? this.context.length : 0; }
 }
-Rule.empty = new Rule([], 2 /* Normal */, null);
+Rule.empty = new Rule([], 2 /* Mode.Normal */, null);
 /**
 Define a [highlighter](#highlight.Highlighter) from an array of
 tag/class pairs. Classes associated with more specific tags will
@@ -274,7 +283,9 @@ function highlightTags(highlighters, tags) {
 }
 /**
 Highlight the given [tree](#common.Tree) with the given
-[highlighter](#highlight.Highlighter).
+[highlighter](#highlight.Highlighter). Often, the higher-level
+[`highlightCode`](#highlight.highlightCode) function is easier to
+use.
 */
 function highlightTree(tree, highlighter, 
 /**
@@ -294,6 +305,35 @@ to = tree.length) {
     let builder = new HighlightBuilder(from, Array.isArray(highlighter) ? highlighter : [highlighter], putStyle);
     builder.highlightRange(tree.cursor(), from, to, "", builder.highlighters);
     builder.flush(to);
+}
+/**
+Highlight the given tree with the given highlighter, calling
+`putText` for every piece of text, either with a set of classes or
+with the empty string when unstyled, and `putBreak` for every line
+break.
+*/
+function highlightCode(code, tree, highlighter, putText, putBreak, from = 0, to = code.length) {
+    let pos = from;
+    function writeTo(p, classes) {
+        if (p <= pos)
+            return;
+        for (let text = code.slice(pos, p), i = 0;;) {
+            let nextBreak = text.indexOf("\n", i);
+            let upto = nextBreak < 0 ? text.length : nextBreak;
+            if (upto > i)
+                putText(text.slice(i, upto), classes);
+            if (nextBreak < 0)
+                break;
+            putBreak();
+            i = nextBreak + 1;
+        }
+        pos = p;
+    }
+    highlightTree(tree, highlighter, (from, to, classes) => {
+        writeTo(from, "");
+        writeTo(to, classes);
+    }, from, to);
+    writeTo(to, "");
 }
 class HighlightBuilder {
     constructor(at, highlighters, span) {
@@ -327,7 +367,7 @@ class HighlightBuilder {
             if (cls)
                 cls += " ";
             cls += tagCls;
-            if (rule.mode == 1 /* Inherit */)
+            if (rule.mode == 1 /* Mode.Inherit */)
                 inheritedClass += (inheritedClass ? " " : "") + tagCls;
         }
         this.startSpan(Math.max(from, start), cls);
@@ -667,7 +707,7 @@ const tags = {
     */
     heading6: t(heading),
     /**
-    A prose separator (such as a horizontal rule).
+    A prose [content](#highlight.tags.content) separator (such as a horizontal rule).
     */
     contentSeparator: t(content),
     /**
@@ -740,31 +780,31 @@ const tags = {
     given element is being defined. Expected to be used with the
     various [name](#highlight.tags.name) tags.
     */
-    definition: Tag.defineModifier(),
+    definition: Tag.defineModifier("definition"),
     /**
     [Modifier](#highlight.Tag^defineModifier) that indicates that
     something is constant. Mostly expected to be used with
     [variable names](#highlight.tags.variableName).
     */
-    constant: Tag.defineModifier(),
+    constant: Tag.defineModifier("constant"),
     /**
     [Modifier](#highlight.Tag^defineModifier) used to indicate that
     a [variable](#highlight.tags.variableName) or [property
     name](#highlight.tags.propertyName) is being called or defined
     as a function.
     */
-    function: Tag.defineModifier(),
+    function: Tag.defineModifier("function"),
     /**
     [Modifier](#highlight.Tag^defineModifier) that can be applied to
     [names](#highlight.tags.name) to indicate that they belong to
     the language's standard environment.
     */
-    standard: Tag.defineModifier(),
+    standard: Tag.defineModifier("standard"),
     /**
     [Modifier](#highlight.Tag^defineModifier) that indicates a given
     [names](#highlight.tags.name) is local to some scope.
     */
-    local: Tag.defineModifier(),
+    local: Tag.defineModifier("local"),
     /**
     A generic variant [modifier](#highlight.Tag^defineModifier) that
     can be used to tag language-specific alternative variants of
@@ -773,8 +813,13 @@ const tags = {
     [variable name](#highlight.tags.variableName) tags, since those
     come up a lot.
     */
-    special: Tag.defineModifier()
+    special: Tag.defineModifier("special")
 };
+for (let name in tags) {
+    let val = tags[name];
+    if (val instanceof Tag)
+        val.name = name;
+}
 /**
 This is a highlighter that adds stable, predictable classes to
 tokens, for styling with external CSS.
@@ -856,4 +901,4 @@ const classHighlighter = tagHighlighter([
     { tag: tags.punctuation, class: "tok-punctuation" }
 ]);
 
-export { Tag, classHighlighter, getStyleTags, highlightTree, styleTags, tagHighlighter, tags };
+export { Tag, classHighlighter, getStyleTags, highlightCode, highlightTree, styleTags, tagHighlighter, tags };

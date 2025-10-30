@@ -33,8 +33,9 @@ use CBOR\Tag\TimestampTag;
 use CBOR\Tag\UnsignedBigIntegerTag;
 use CBOR\Tag\UriTag;
 use InvalidArgumentException;
-use function ord;
 use RuntimeException;
+use function ord;
+use function sprintf;
 use const STR_PAD_LEFT;
 
 final class Decoder implements DecoderInterface

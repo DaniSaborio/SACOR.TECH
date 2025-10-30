@@ -25,7 +25,7 @@ const rotate = (angle, image) => {
   ctx.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
 
   // The format
-  const format = Joomla.MediaManager.Edit.original.extension === 'jpg' ? 'jpeg' : 'jpg';
+  const format = Joomla.MediaManager.Edit.original.extension.toLowerCase() === 'jpg' ? 'jpeg' : Joomla.MediaManager.Edit.original.extension.toLowerCase();
 
   // The quality
   const quality = document.getElementById('jform_rotate_quality').value;
@@ -57,24 +57,18 @@ const initRotate = image => {
       rotate(parseInt(target.value, 10), image);
       target.value = 0;
       // Deselect all buttons
-      [].slice.call(document.querySelectorAll('#jform_rotate_distinct label')).forEach(element => {
-        element.classList.remove('active');
-        element.classList.remove('focus');
-      });
+      document.querySelectorAll('#jform_rotate_distinct label').forEach(element => element.classList.remove('active', 'focus'));
     });
 
     // The 90 degree rotate buttons listeners
-    [].slice.call(document.querySelectorAll('#jform_rotate_distinct [type=radio]')).forEach(element => {
+    document.querySelectorAll('#jform_rotate_distinct [type=radio]').forEach(element => {
       element.addEventListener('click', ({
         target
       }) => {
         rotate(parseInt(target.value, 10), image);
 
         // Deselect all buttons
-        [].slice.call(document.querySelectorAll('#jform_rotate_distinct label')).forEach(el => {
-          el.classList.remove('active');
-          el.classList.remove('focus');
-        });
+        document.querySelectorAll('#jform_rotate_distinct label').forEach(el => el.classList.remove('active', 'focus'));
       });
     });
     activated = true;
@@ -90,7 +84,7 @@ window.addEventListener('media-manager-edit-init', () => {
         resolve();
       });
     },
-    Deactivate( /* image */
+    Deactivate(/* image */
     ) {
       return new Promise(resolve => {
         resolve();

@@ -1,4 +1,4 @@
-import { E as EventHandler, f as isDisabled, S as SelectorEngine, d as defineJQueryPlugin, B as BaseComponent, g as getNextActiveElement } from './dom.js?5.3.2';
+import { E as EventHandler, f as isDisabled, S as SelectorEngine, d as defineJQueryPlugin, B as BaseComponent, g as getNextActiveElement } from './dom.js?5.3.8';
 
 /**
  * --------------------------------------------------------------------------
@@ -6,6 +6,7 @@ import { E as EventHandler, f as isDisabled, S as SelectorEngine, d as defineJQu
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -310,15 +311,13 @@ Joomla.initialiseTabs = (el, options) => {
             li.setAttribute('role', 'presentation');
             li.appendChild(link);
             ul.appendChild(li);
-
-            // eslint-disable-next-line no-new
             new window.bootstrap.Tab(li);
           }
         });
       }
     }
   } else {
-    Array.from(document.querySelectorAll(`${el} a`)).map(tab => new window.bootstrap.Tab(tab, options));
+    document.querySelectorAll(`${el} a`).forEach(tab => new window.bootstrap.Tab(tab, options));
   }
 };
 if (Joomla && Joomla.getOptions) {

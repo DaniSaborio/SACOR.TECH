@@ -27,4 +27,10 @@ echo $this->loadAnyTemplate('schedule/check');
 
 echo HTMLHelper::_('uitab.endTab');
 
+echo HTMLHelper::_('uitab.addTab', 'akeebabackup-scheduling', 'akeebabackup-scheduling-checkuploads', Text::_('COM_AKEEBABACKUP_SCHEDULE_LBL_CHECK_UPLOADS', true));
+
+echo $this->loadAnyTemplate('schedule/upload');
+
+echo HTMLHelper::_('uitab.endTab');
+
 echo HTMLHelper::_('uitab.endTabSet');

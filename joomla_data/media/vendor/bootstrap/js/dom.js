@@ -194,12 +194,11 @@ const noop = () => {};
  * @param {HTMLElement} element
  * @return void
  *
- * @see https://www.charistheo.io/blog/2021/02/restart-a-css-animation-with-javascript/#restarting-a-css-animation
+ * @see https://www.harrytheo.com/blog/2021/02/restart-a-css-animation-with-javascript/#restarting-a-css-animation
  */
 const reflow = element => {
   element.offsetHeight; // eslint-disable-line no-unused-expressions
 };
-
 const getjQuery = () => {
   if (window.jQuery && !document.body.hasAttribute('data-bs-no-jquery')) {
     return window.jQuery;
@@ -239,13 +238,10 @@ const defineJQueryPlugin = plugin => {
     }
   });
 };
-const execute = function (possibleCallback) {
-  let args = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
-  let defaultValue = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : possibleCallback;
-  return typeof possibleCallback === 'function' ? possibleCallback(...args) : defaultValue;
+const execute = (possibleCallback, args = [], defaultValue = possibleCallback) => {
+  return typeof possibleCallback === 'function' ? possibleCallback.call(...args) : defaultValue;
 };
-const executeAfterTransition = function (callback, transitionElement) {
-  let waitForTransition = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+const executeAfterTransition = (callback, transitionElement, waitForTransition = true) => {
   if (!waitForTransition) {
     execute(callback);
     return;
@@ -253,10 +249,9 @@ const executeAfterTransition = function (callback, transitionElement) {
   const durationPadding = 5;
   const emulatedDuration = getTransitionDurationFromElement(transitionElement) + durationPadding;
   let called = false;
-  const handler = _ref => {
-    let {
-      target
-    } = _ref;
+  const handler = ({
+    target
+  }) => {
     if (target !== transitionElement) {
       return;
     }
@@ -303,6 +298,7 @@ const getNextActiveElement = (list, activeElement, shouldGetNext, isCycleAllowed
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -364,8 +360,7 @@ function bootstrapDelegationHandler(element, selector, fn) {
     }
   };
 }
-function findHandler(events, callable) {
-  let delegationSelector = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : null;
+function findHandler(events, callable, delegationSelector = null) {
   return Object.values(events).find(event => event.callable === callable && event.delegationSelector === delegationSelector);
 }
 function normalizeParameters(originalTypeEvent, handler, delegationFunction) {
@@ -503,8 +498,7 @@ const EventHandler = {
     return evt;
   }
 };
-function hydrateObj(obj) {
-  let meta = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+function hydrateObj(obj, meta = {}) {
   for (const [key, value] of Object.entries(meta)) {
     try {
       obj[key] = value;
@@ -567,7 +561,7 @@ const Manipulator = {
     const bsKeys = Object.keys(element.dataset).filter(key => key.startsWith('bs') && !key.startsWith('bsConfig'));
     for (const key of bsKeys) {
       let pureKey = key.replace(/^bs/, '');
-      pureKey = pureKey.charAt(0).toLowerCase() + pureKey.slice(1, pureKey.length);
+      pureKey = pureKey.charAt(0).toLowerCase() + pureKey.slice(1);
       attributes[pureKey] = normalizeData(element.dataset[key]);
     }
     return attributes;
@@ -583,6 +577,7 @@ const Manipulator = {
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Class definition
@@ -618,8 +613,7 @@ class Config {
       ...(typeof config === 'object' ? config : {})
     };
   }
-  _typeCheckConfig(config) {
-    let configTypes = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : this.constructor.DefaultType;
+  _typeCheckConfig(config, configTypes = this.constructor.DefaultType) {
     for (const [property, expectedTypes] of Object.entries(configTypes)) {
       const value = config[property];
       const valueType = isElement(value) ? 'element' : toType(value);
@@ -637,11 +631,12 @@ class Config {
  * --------------------------------------------------------------------------
  */
 
+
 /**
  * Constants
  */
 
-const VERSION = '5.3.2';
+const VERSION = '5.3.8';
 
 /**
  * Class definition
@@ -667,8 +662,9 @@ class BaseComponent extends Config {
       this[propertyName] = null;
     }
   }
-  _queueCallback(callback, element) {
-    let isAnimated = arguments.length > 2 && arguments[2] !== undefined ? arguments[2] : true;
+
+  // Private
+  _queueCallback(callback, element, isAnimated = true) {
     executeAfterTransition(callback, element, isAnimated);
   }
   _getConfig(config) {
@@ -682,8 +678,7 @@ class BaseComponent extends Config {
   static getInstance(element) {
     return Data.get(getElement(element), this.DATA_KEY);
   }
-  static getOrCreateInstance(element) {
-    let config = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
+  static getOrCreateInstance(element, config = {}) {
     return this.getInstance(element) || new this(element, typeof config === 'object' ? config : null);
   }
   static get VERSION() {
@@ -706,6 +701,7 @@ class BaseComponent extends Config {
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 const getSelector = element => {
   let selector = element.getAttribute('data-bs-target');
   if (!selector || selector === '#') {
@@ -723,17 +719,15 @@ const getSelector = element => {
     if (hrefAttribute.includes('#') && !hrefAttribute.startsWith('#')) {
       hrefAttribute = `#${hrefAttribute.split('#')[1]}`;
     }
-    selector = hrefAttribute && hrefAttribute !== '#' ? parseSelector(hrefAttribute.trim()) : null;
+    selector = hrefAttribute && hrefAttribute !== '#' ? hrefAttribute.trim() : null;
   }
-  return selector;
+  return selector ? selector.split(',').map(sel => parseSelector(sel)).join(',') : null;
 };
 const SelectorEngine = {
-  find(selector) {
-    let element = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : document.documentElement;
+  find(selector, element = document.documentElement) {
     return [].concat(...Element.prototype.querySelectorAll.call(element, selector));
   },
-  findOne(selector) {
-    let element = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : document.documentElement;
+  findOne(selector, element = document.documentElement) {
     return Element.prototype.querySelector.call(element, selector);
   },
   children(element, selector) {
@@ -796,8 +790,8 @@ const SelectorEngine = {
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
-const enableDismissTrigger = function (component) {
-  let method = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 'hide';
+
+const enableDismissTrigger = (component, method = 'hide') => {
   const clickEvent = `click.dismiss${component.EVENT_KEY}`;
   const name = component.NAME;
   EventHandler.on(document, clickEvent, `[data-bs-dismiss="${name}"]`, function (event) {
@@ -821,6 +815,7 @@ const enableDismissTrigger = function (component) {
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -941,6 +936,7 @@ class Swipe extends Config {
  * --------------------------------------------------------------------------
  */
 
+
 /**
  * Constants
  */
@@ -957,7 +953,6 @@ const Default$2 = {
   // if false, we use the backdrop helper without adding any element to the dom
   rootElement: 'body' // give the choice to place backdrop under different elements
 };
-
 const DefaultType$2 = {
   className: 'string',
   clickCallback: '(function|null)',
@@ -1065,6 +1060,7 @@ class Backdrop extends Config {
  * --------------------------------------------------------------------------
  */
 
+
 /**
  * Constants
  */
@@ -1081,7 +1077,6 @@ const Default$1 = {
   autofocus: true,
   trapElement: null // The element to trap focus inside of
 };
-
 const DefaultType$1 = {
   autofocus: 'boolean',
   trapElement: 'element'
@@ -1162,6 +1157,7 @@ class FocusTrap extends Config {
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -1271,7 +1267,10 @@ const DefaultAllowlist = {
   br: [],
   col: [],
   code: [],
+  dd: [],
   div: [],
+  dl: [],
+  dt: [],
   em: [],
   hr: [],
   h1: [],
@@ -1305,7 +1304,6 @@ const uriAttributes = new Set(['background', 'cite', 'href', 'itemtype', 'longde
  *
  * Shout-out to Angular https://github.com/angular/angular/blob/15.2.8/packages/core/src/sanitization/url_sanitizer.ts#L38
  */
-// eslint-disable-next-line unicorn/better-regex
 const SAFE_URL_PATTERN = /^(?!javascript:)(?:[a-z0-9+.-]+:|[^&:/?#]*(?:[/?#]|$))/i;
 const allowedAttribute = (attribute, allowedAttributeList) => {
   const attributeName = attribute.nodeName.toLowerCase();
@@ -1352,6 +1350,7 @@ function sanitizeHtml(unsafeHtml, allowList, sanitizeFunction) {
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -1469,7 +1468,7 @@ class TemplateFactory extends Config {
     return this._config.sanitize ? sanitizeHtml(arg, this._config.allowList, this._config.sanitizeFn) : arg;
   }
   _resolvePossibleFunction(arg) {
-    return execute(arg, [this]);
+    return execute(arg, [undefined, this]);
   }
   _putElementInTemplate(element, templateElement) {
     if (this._config.html) {

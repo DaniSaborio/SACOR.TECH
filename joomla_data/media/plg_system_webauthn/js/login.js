@@ -160,7 +160,6 @@ window.Joomla = window.Joomla || {};
    *
    * @returns {boolean}  Always FALSE to prevent BUTTON elements from reloading the page.
    */
-  // eslint-disable-next-line no-unused-vars
   Joomla.plgSystemWebauthnLogin = formId => {
     // Get the username
     const elFormContainer = document.getElementById(formId);
@@ -220,14 +219,9 @@ window.Joomla = window.Joomla || {};
   };
 
   // Initialization. Runs on DOM content loaded since this script is always loaded deferred.
-  const loginButtons = [].slice.call(document.querySelectorAll('.plg_system_webauthn_login_button'));
-  if (loginButtons.length) {
-    loginButtons.forEach(button => {
-      button.addEventListener('click', ({
-        currentTarget
-      }) => {
-        Joomla.plgSystemWebauthnLogin(currentTarget.getAttribute('data-webauthn-form'));
-      });
-    });
-  }
+  document.querySelectorAll('.plg_system_webauthn_login_button').forEach(button => {
+    button.addEventListener('click', ({
+      currentTarget
+    }) => Joomla.plgSystemWebauthnLogin(currentTarget.getAttribute('data-webauthn-form')));
+  });
 })(Joomla, document);

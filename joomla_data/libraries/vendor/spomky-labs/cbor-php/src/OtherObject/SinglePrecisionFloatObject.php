@@ -7,8 +7,9 @@ namespace CBOR\OtherObject;
 use Brick\Math\BigInteger;
 use CBOR\OtherObject as Base;
 use CBOR\Utils;
-use const INF;
 use InvalidArgumentException;
+use function strlen;
+use const INF;
 use const NAN;
 
 final class SinglePrecisionFloatObject extends Base
@@ -25,7 +26,7 @@ final class SinglePrecisionFloatObject extends Base
 
     public static function create(string $value): self
     {
-        if (mb_strlen($value, '8bit') !== 4) {
+        if (strlen($value) !== 4) {
             throw new InvalidArgumentException('The value is not a valid single precision floating point');
         }
 

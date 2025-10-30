@@ -24,9 +24,9 @@ interface DumpableInterface
      *                                       form. A depth of 1 will recurse into the first level of properties only.
      * @param   ?\SplObjectStorage  $dumped  An array of already serialized objects that is used to avoid infinite loops.
      *
-     * @return  \stdClass
+     * @return  \stdClass|array
      *
      * @since   1.0
      */
-    public function dump($depth = 3, \SplObjectStorage $dumped = null);
+    public function dump($depth = 3, ?\SplObjectStorage $dumped = null);
 }

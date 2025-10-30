@@ -1,4 +1,4 @@
-import { E as EventHandler, S as SelectorEngine, d as defineJQueryPlugin, B as BaseComponent, c as getElement, f as isDisabled, i as isVisible } from './dom.js?5.3.2';
+import { E as EventHandler, S as SelectorEngine, d as defineJQueryPlugin, B as BaseComponent, c as getElement, f as isDisabled, i as isVisible } from './dom.js?5.3.8';
 
 /**
  * --------------------------------------------------------------------------
@@ -6,6 +6,7 @@ import { E as EventHandler, S as SelectorEngine, d as defineJQueryPlugin, B as B
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants

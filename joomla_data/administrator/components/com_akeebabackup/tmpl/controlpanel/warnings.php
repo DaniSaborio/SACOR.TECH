@@ -17,11 +17,6 @@ use Joomla\CMS\Language\Text;
 use Joomla\CMS\Router\Route;
 use Joomla\CMS\Uri\Uri;
 
-if (version_compare(JVERSION, '4.999.999', 'lt'))
-{
-	$this->loadAnyTemplate('Controlpanel/joomla_eol');
-}
-
 $cloudFlareTestFile = 'CLOUDFLARE::' . Uri::base() . 'media/com_akeebabackup/ControlPanel.min.js';
 $cloudFlareTestFile .= '?' . ApplicationHelper::getHash(AKEEBABACKUP_VERSION . AKEEBABACKUP_DATE);
 

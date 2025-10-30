@@ -1,4 +1,4 @@
-import { e as enableDismissTrigger, d as defineJQueryPlugin, B as BaseComponent, E as EventHandler, r as reflow } from './dom.js?5.3.2';
+import { e as enableDismissTrigger, d as defineJQueryPlugin, B as BaseComponent, E as EventHandler, r as reflow } from './dom.js?5.3.8';
 
 /**
  * --------------------------------------------------------------------------
@@ -6,6 +6,7 @@ import { e as enableDismissTrigger, d as defineJQueryPlugin, B as BaseComponent,
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -109,7 +110,6 @@ class Toast extends BaseComponent {
   }
 
   // Private
-
   _maybeScheduleHide() {
     if (!this._config.autohide) {
       return;

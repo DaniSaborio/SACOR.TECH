@@ -56,7 +56,7 @@ class File
         $ext = substr($file, $dot + 1);
 
         // Extension cannot contain slashes.
-        if (strpos($ext, '/') !== false || (DIRECTORY_SEPARATOR === '\\' && strpos($ext, '\\') !== false)) {
+        if (str_contains($ext, '/') || (DIRECTORY_SEPARATOR === '\\' && str_contains($ext, '\\'))) {
             return '';
         }
 
@@ -228,9 +228,9 @@ class File
         }
 
         if (
-            ini_get('opcache.enable')
+            \ini_get('opcache.enable')
             && \function_exists('opcache_invalidate')
-            && (!ini_get('opcache.restrict_api') || stripos(realpath($_SERVER['SCRIPT_FILENAME']), ini_get('opcache.restrict_api')) === 0)
+            && (!\ini_get('opcache.restrict_api') || stripos(realpath($_SERVER['SCRIPT_FILENAME']), \ini_get('opcache.restrict_api')) === 0)
         ) {
             static::$canFlushFileCache = true;
         } else {
@@ -404,12 +404,12 @@ class File
     public static function write($file, $buffer, $useStreams = false)
     {
         if (\function_exists('set_time_limit')) {
-            set_time_limit(ini_get('max_execution_time'));
+            set_time_limit(\ini_get('max_execution_time'));
         }
 
         // If the destination directory doesn't exist we need to create it
         if (!file_exists(\dirname($file))) {
-            if (Folder::create(\dirname($file)) == false) {
+            if (!Folder::create(\dirname($file))) {
                 return false;
             }
         }
@@ -465,7 +465,7 @@ class File
     public static function append($file, $buffer, $useStreams = false)
     {
         if (\function_exists('set_time_limit')) {
-            set_time_limit(ini_get('max_execution_time'));
+            set_time_limit(\ini_get('max_execution_time'));
         }
 
         // If the file doesn't exist, just write instead of append

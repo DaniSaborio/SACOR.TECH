@@ -37,7 +37,7 @@ class PushModel extends BaseDatabaseModel
 {
 	use WebPushModelTrait;
 
-	public function __construct($config = [], MVCFactoryInterface $factory = null)
+	public function __construct($config = [], ?MVCFactoryInterface $factory = null)
 	{
 		parent::__construct($config, $factory);
 

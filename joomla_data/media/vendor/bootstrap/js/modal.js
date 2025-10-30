@@ -1,4 +1,4 @@
-import { E as EventHandler, S as SelectorEngine, i as isVisible, e as enableDismissTrigger, d as defineJQueryPlugin, B as BaseComponent, k as ScrollBarHelper, l as Backdrop, F as FocusTrap, r as reflow, b as isRTL } from './dom.js?5.3.2';
+import { E as EventHandler, S as SelectorEngine, i as isVisible, e as enableDismissTrigger, d as defineJQueryPlugin, B as BaseComponent, k as ScrollBarHelper, l as Backdrop, F as FocusTrap, r as reflow, b as isRTL } from './dom.js?5.3.8';
 
 /**
  * --------------------------------------------------------------------------
@@ -6,6 +6,7 @@ import { E as EventHandler, S as SelectorEngine, i as isVisible, e as enableDism
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -315,8 +316,6 @@ Joomla.initialiseModal = (modal, options) => {
   if (!(modal instanceof Element)) {
     return;
   }
-
-  // eslint-disable-next-line no-new
   new window.bootstrap.Modal(modal, options);
 
   // Comply with the Joomla API - Bound element.open/close
@@ -350,7 +349,6 @@ Joomla.initialiseModal = (modal, options) => {
         let el;
         idFieldArr[0] = idFieldArr[0].replace(/&quot;/g, '"');
         if (!document.getElementById(idFieldArr[1])) {
-          // eslint-disable-next-line no-new-func
           const fn = new Function(`return ${idFieldArr[0]}`); // This is UNSAFE!!!!
           el = fn.call(null);
         } else {
@@ -420,9 +418,17 @@ Joomla.iframeButtonClick = options => {
   if (!options.iframeSelector || !options.buttonSelector) {
     throw new Error('Selector is missing');
   }
+
+  // Backward compatibility for older buttons
+  const old2newBtn = {
+    '#closeBtn': '#closeBtn, #toolbar-cancel>button',
+    '#saveBtn': '#saveBtn, #toolbar-save>button',
+    '#applyBtn': '#applyBtn, #toolbar-apply>button'
+  };
   const iframe = document.querySelector(`${options.iframeSelector} iframe`);
   if (iframe) {
-    const button = iframe.contentWindow.document.querySelector(options.buttonSelector);
+    const selector = old2newBtn[options.buttonSelector] ? old2newBtn[options.buttonSelector] : options.buttonSelector;
+    const button = iframe.contentWindow.document.querySelector(selector);
     if (button) {
       button.click();
     }
@@ -440,7 +446,7 @@ if (Joomla && Joomla.getOptions) {
         keyboard: opt.keyboard ? opt.keyboard : true,
         focus: opt.focus ? opt.focus : true
       };
-      Array.from(document.querySelectorAll(modal)).map(modalEl => Joomla.initialiseModal(modalEl, options));
+      document.querySelectorAll(modal).forEach(modalEl => Joomla.initialiseModal(modalEl, options));
     });
   }
 }

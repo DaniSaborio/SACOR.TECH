@@ -3,7 +3,7 @@
         'name' => 'akeeba/akeebabackup',
         'pretty_version' => '9.3.x-dev',
         'version' => '9.3.9999999.9999999-dev',
-        'reference' => 'dfe2870ce67f9a04b02ceff8eeea12e5d484db33',
+        'reference' => '54e3052398cf62ce4e950ddb7fd94e5f7230025d',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         'akeeba/akeebabackup' => array(
             'pretty_version' => '9.3.x-dev',
             'version' => '9.3.9999999.9999999-dev',
-            'reference' => 'dfe2870ce67f9a04b02ceff8eeea12e5d484db33',
+            'reference' => '54e3052398cf62ce4e950ddb7fd94e5f7230025d',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../../../',
             'aliases' => array(),
@@ -22,7 +22,7 @@
         'akeeba/engine' => array(
             'pretty_version' => 'dev-development',
             'version' => 'dev-development',
-            'reference' => 'cc32068789ade31c7c9dd0e7ca8d811a6d5fc853',
+            'reference' => '57b93c30fff6aad5c14d75d2a5f17162d66bd0cd',
             'type' => 'library',
             'install_path' => __DIR__ . '/../akeeba/engine',
             'aliases' => array(
@@ -64,7 +64,7 @@
         'akeeba/webpush' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '1a947df69e0c4014bda62e2fb140d385115578fc',
+            'reference' => '25c2dfe97ddc9de936dc8880488ac5a77d9583f2',
             'type' => 'library',
             'install_path' => __DIR__ . '/../akeeba/webpush',
             'aliases' => array(
@@ -75,7 +75,7 @@
         'composer/ca-bundle' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => '719026bb30813accb68271fee7e39552a58e9f65',
+            'reference' => '96a9896f1a7d418fc78c0c7b2a3757664f80e7fc',
             'type' => 'library',
             'install_path' => __DIR__ . '/./ca-bundle',
             'aliases' => array(

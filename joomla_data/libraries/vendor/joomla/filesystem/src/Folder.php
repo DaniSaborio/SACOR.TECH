@@ -34,8 +34,7 @@ abstract class Folder
      */
     public static function copy($src, $dest, $path = '', $force = false, $useStreams = false)
     {
-        if (\function_exists('set_time_limit'))
-        {
+        if (\function_exists('set_time_limit')) {
             set_time_limit(ini_get('max_execution_time'));
         }
 
@@ -90,6 +89,8 @@ abstract class Folder
                             throw new FilesystemException('Copy file failed', -1);
                         }
                     }
+
+                    File::invalidateFileCache($dfid);
 
                     break;
             }
@@ -211,8 +212,7 @@ abstract class Folder
      */
     public static function delete($path)
     {
-        if (\function_exists('set_time_limit'))
-        {
+        if (\function_exists('set_time_limit')) {
             set_time_limit(ini_get('max_execution_time'));
         }
 
@@ -439,8 +439,7 @@ abstract class Folder
      */
     protected static function _items($path, $filter, $recurse, $full, $exclude, $excludeFilterString, $findfiles)
     {
-        if (\function_exists('set_time_limit'))
-        {
+        if (\function_exists('set_time_limit')) {
             set_time_limit(ini_get('max_execution_time'));
         }
 
@@ -547,5 +546,17 @@ abstract class Folder
         $regex = ['#[^A-Za-z0-9_\\\/\(\)\[\]\{\}\#\$\^\+\.\'~`!@&=;,-]#'];
 
         return preg_replace($regex, '', $path);
+    }
+
+    /**
+     * Wrapper for the standard is_dir function
+     *
+     * @param   string  $path  Folder path
+     *
+     * @return  boolean  True if path is a folder
+     */
+    public static function exists(string $path): bool
+    {
+        return is_dir(Path::clean($path));
     }
 }

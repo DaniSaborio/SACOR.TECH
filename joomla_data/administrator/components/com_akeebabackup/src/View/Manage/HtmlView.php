@@ -625,26 +625,15 @@ class HtmlView extends BaseHtmlView
 			];
 		}
 
-		if ($model->getState('filter.frozen') == 1)
-		{
-			$filters[] = [
-				'field'   => 'frozen',
-				'operand' => '=',
-				'value'   => 1,
-			];
-		}
-		elseif ($model->getState('filter.frozen') == 2)
-		{
-			$filters[] = [
-				'field'   => 'frozen',
-				'operand' => '=',
-				'value'   => 0,
-			];
-		}
+		$filterFrozen = $model->getState('filter.frozen');
 
-		if (empty($filters))
+		if (is_numeric($filterFrozen))
 		{
-			$filters = null;
+			$filters[] = [
+				'field'   => 'frozen',
+				'operand' => '=',
+				'value'   => intval($filterFrozen) === 2 ? 0 : 1,
+			];
 		}
 
 		return $filters;

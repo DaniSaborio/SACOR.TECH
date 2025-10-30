@@ -29,7 +29,7 @@ class ConfigurationwizardController extends BaseController
 	private bool $noFlush = false;
 
 	public function __construct(
-		$config = [], MVCFactoryInterface $factory = null, ?CMSApplication $app = null, ?Input $input = null
+		$config = [], ?MVCFactoryInterface $factory = null, ?CMSApplication $app = null, ?Input $input = null
 	)
 	{
 		parent::__construct($config, $factory, $app, $input);

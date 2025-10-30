@@ -1,6 +1,6 @@
-import { NodeType, NodeProp, IterMode, Tree, TreeFragment, Parser, NodeSet } from '@lezer/common';
-import { Facet, EditorState, StateEffect, StateField, countColumn, RangeSet, combineConfig, RangeSetBuilder, Prec } from '@codemirror/state';
-import { ViewPlugin, logException, EditorView, Decoration, WidgetType, gutter, GutterMarker } from '@codemirror/view';
+import { NodeType, NodeProp, Tree, IterMode, TreeFragment, Parser, NodeSet } from '@lezer/common';
+import { EditorState, Facet, StateEffect, StateField, countColumn, RangeSetBuilder, RangeSet, Prec, combineConfig } from '@codemirror/state';
+import { Decoration, Direction, ViewPlugin, EditorView, logException, gutter, GutterMarker, WidgetType } from '@codemirror/view';
 import { tags, styleTags, tagHighlighter, highlightTree } from '@lezer/highlight';
 
 const C = "\u037c";
@@ -87,7 +87,7 @@ class StyleModule {
     let set = root[SET], nonce = options && options.nonce;
     if (!set) set = new StyleSet(root, nonce);
     else if (nonce) set.setNonce(nonce);
-    set.mount(Array.isArray(modules) ? modules : [modules]);
+    set.mount(Array.isArray(modules) ? modules : [modules], root);
   }
 }
 
@@ -98,24 +98,18 @@ class StyleSet {
     let doc = root.ownerDocument || root, win = doc.defaultView;
     if (!root.head && root.adoptedStyleSheets && win.CSSStyleSheet) {
       let adopted = adoptedSet.get(doc);
-      if (adopted) {
-        root.adoptedStyleSheets = [adopted.sheet, ...root.adoptedStyleSheets];
-        return root[SET] = adopted
-      }
+      if (adopted) return root[SET] = adopted
       this.sheet = new win.CSSStyleSheet;
-      root.adoptedStyleSheets = [this.sheet, ...root.adoptedStyleSheets];
       adoptedSet.set(doc, this);
     } else {
       this.styleTag = doc.createElement("style");
       if (nonce) this.styleTag.setAttribute("nonce", nonce);
-      let target = root.head || root;
-      target.insertBefore(this.styleTag, target.firstChild);
     }
     this.modules = [];
     root[SET] = this;
   }
 
-  mount(modules) {
+  mount(modules, root) {
     let sheet = this.sheet;
     let pos = 0 /* Current rule offset */, j = 0; /* Index into this.modules */
     for (let i = 0; i < modules.length; i++) {
@@ -136,11 +130,17 @@ class StyleSet {
       }
     }
 
-    if (!sheet) {
+    if (sheet) {
+      if (root.adoptedStyleSheets.indexOf(this.sheet) < 0)
+        root.adoptedStyleSheets = [this.sheet, ...root.adoptedStyleSheets];
+    } else {
       let text = "";
       for (let i = 0; i < this.modules.length; i++)
         text += this.modules[i].getRules() + "\n";
       this.styleTag.textContent = text;
+      let target = root.head || root;
+      if (this.styleTag.parentNode != target)
+        target.insertBefore(this.styleTag, target.firstChild);
     }
   }
 
@@ -706,14 +706,14 @@ class LanguageState {
         // state updates with parse work beyond the viewport.
         let upto = this.context.treeLen == tr.startState.doc.length ? undefined
             : Math.max(tr.changes.mapPos(this.context.treeLen), newCx.viewport.to);
-        if (!newCx.work(20 /* Apply */, upto))
+        if (!newCx.work(20 /* Work.Apply */, upto))
             newCx.takeTree();
         return new LanguageState(newCx);
     }
     static init(state) {
-        let vpTo = Math.min(3000 /* InitViewport */, state.doc.length);
+        let vpTo = Math.min(3000 /* Work.InitViewport */, state.doc.length);
         let parseState = ParseContext.create(state.facet(language).parser, state, { from: 0, to: vpTo });
-        if (!parseState.work(20 /* Apply */, vpTo))
+        if (!parseState.work(20 /* Work.Apply */, vpTo))
             parseState.takeTree();
         return new LanguageState(parseState);
     }
@@ -730,14 +730,14 @@ Language.state = /*@__PURE__*/StateField.define({
     }
 });
 let requestIdle = (callback) => {
-    let timeout = setTimeout(() => callback(), 500 /* MaxPause */);
+    let timeout = setTimeout(() => callback(), 500 /* Work.MaxPause */);
     return () => clearTimeout(timeout);
 };
 if (typeof requestIdleCallback != "undefined")
     requestIdle = (callback) => {
         let idle = -1, timeout = setTimeout(() => {
-            idle = requestIdleCallback(callback, { timeout: 500 /* MaxPause */ - 100 /* MinPause */ });
-        }, 100 /* MinPause */);
+            idle = requestIdleCallback(callback, { timeout: 500 /* Work.MaxPause */ - 100 /* Work.MinPause */ });
+        }, 100 /* Work.MinPause */);
         return () => idle < 0 ? clearTimeout(timeout) : cancelIdleCallback(idle);
     };
 const isInputPending = typeof navigator != "undefined" && ((_a = navigator.scheduling) === null || _a === void 0 ? void 0 : _a.isInputPending)
@@ -758,9 +758,9 @@ const parseWorker = /*@__PURE__*/ViewPlugin.fromClass(class ParseWorker {
         let cx = this.view.state.field(Language.state).context;
         if (cx.updateViewport(update.view.viewport) || this.view.viewport.to > cx.treeLen)
             this.scheduleWork();
-        if (update.docChanged) {
+        if (update.docChanged || update.selectionSet) {
             if (this.view.hasFocus)
-                this.chunkBudget += 50 /* ChangeBonus */;
+                this.chunkBudget += 50 /* Work.ChangeBonus */;
             this.scheduleWork();
         }
         this.checkAsyncSchedule(cx);
@@ -776,19 +776,19 @@ const parseWorker = /*@__PURE__*/ViewPlugin.fromClass(class ParseWorker {
         this.working = null;
         let now = Date.now();
         if (this.chunkEnd < now && (this.chunkEnd < 0 || this.view.hasFocus)) { // Start a new chunk
-            this.chunkEnd = now + 30000 /* ChunkTime */;
-            this.chunkBudget = 3000 /* ChunkBudget */;
+            this.chunkEnd = now + 30000 /* Work.ChunkTime */;
+            this.chunkBudget = 3000 /* Work.ChunkBudget */;
         }
         if (this.chunkBudget <= 0)
             return; // No more budget
         let { state, viewport: { to: vpTo } } = this.view, field = state.field(Language.state);
-        if (field.tree == field.context.tree && field.context.isDone(vpTo + 100000 /* MaxParseAhead */))
+        if (field.tree == field.context.tree && field.context.isDone(vpTo + 100000 /* Work.MaxParseAhead */))
             return;
-        let endTime = Date.now() + Math.min(this.chunkBudget, 100 /* Slice */, deadline && !isInputPending ? Math.max(25 /* MinSlice */, deadline.timeRemaining() - 5) : 1e9);
+        let endTime = Date.now() + Math.min(this.chunkBudget, 100 /* Work.Slice */, deadline && !isInputPending ? Math.max(25 /* Work.MinSlice */, deadline.timeRemaining() - 5) : 1e9);
         let viewportFirst = field.context.treeLen < vpTo && state.doc.length > vpTo + 1000;
         let done = field.context.work(() => {
             return isInputPending && isInputPending() || Date.now() > endTime;
-        }, vpTo + (viewportFirst ? 0 : 100000 /* MaxParseAhead */));
+        }, vpTo + (viewportFirst ? 0 : 100000 /* Work.MaxParseAhead */));
         this.chunkBudget -= Date.now() - now;
         if (done || this.chunkBudget <= 0) {
             field.context.takeTree();
@@ -973,8 +973,8 @@ service.
 const indentService = /*@__PURE__*/Facet.define();
 /**
 Facet for overriding the unit by which indentation happens. Should
-be a string consisting either entirely of the same whitespace
-character. When not set, this defaults to 2 spaces.
+be a string consisting entirely of the same whitespace character.
+When not set, this defaults to 2 spaces.
 */
 const indentUnit = /*@__PURE__*/Facet.define({
     combine: values => {
@@ -1164,7 +1164,25 @@ indicates that no definitive indentation can be determined.
 const indentNodeProp = /*@__PURE__*/new NodeProp();
 // Compute the indentation for a given position from the syntax tree.
 function syntaxIndentation(cx, ast, pos) {
-    return indentFrom(ast.resolveInner(pos).enterUnfinishedNodesBefore(pos), pos, cx);
+    let stack = ast.resolveStack(pos);
+    let inner = ast.resolveInner(pos, -1).resolve(pos, 0).enterUnfinishedNodesBefore(pos);
+    if (inner != stack.node) {
+        let add = [];
+        for (let cur = inner; cur && !(cur.from < stack.node.from || cur.to > stack.node.to ||
+            cur.from == stack.node.from && cur.type == stack.node.type); cur = cur.parent)
+            add.push(cur);
+        for (let i = add.length - 1; i >= 0; i--)
+            stack = { node: add[i], next: stack };
+    }
+    return indentFor(stack, cx, pos);
+}
+function indentFor(stack, cx, pos) {
+    for (let cur = stack; cur; cur = cur.next) {
+        let strategy = indentStrategy(cur.node);
+        if (strategy)
+            return strategy(TreeIndentContext.create(cx, pos, cur));
+    }
+    return 0;
 }
 function ignoreClosed(cx) {
     return cx.pos == cx.options.simulateBreak && cx.options.simulateDoubleBreak;
@@ -1180,14 +1198,6 @@ function indentStrategy(tree) {
     }
     return tree.parent == null ? topIndent : null;
 }
-function indentFrom(node, pos, base) {
-    for (; node; node = node.parent) {
-        let strategy = indentStrategy(node);
-        if (strategy)
-            return strategy(TreeIndentContext.create(base, pos, node));
-    }
-    return null;
-}
 function topIndent() { return 0; }
 /**
 Objects of this type provide context information and helper
@@ -1200,20 +1210,24 @@ class TreeIndentContext extends IndentContext {
     */
     pos, 
     /**
-    The syntax tree node to which the indentation strategy
-    applies.
+    @internal
     */
-    node) {
+    context) {
         super(base.state, base.options);
         this.base = base;
         this.pos = pos;
-        this.node = node;
+        this.context = context;
     }
+    /**
+    The syntax tree node to which the indentation strategy
+    applies.
+    */
+    get node() { return this.context.node; }
     /**
     @internal
     */
-    static create(base, pos, node) {
-        return new TreeIndentContext(base, pos, node);
+    static create(base, pos, context) {
+        return new TreeIndentContext(base, pos, context);
     }
     /**
     Get the text directly after `this.pos`, either the entire line
@@ -1254,8 +1268,7 @@ class TreeIndentContext extends IndentContext {
     and return the result of that.
     */
     continue() {
-        let parent = this.node.parent;
-        return parent ? indentFrom(parent, this.pos, this.base) : 0;
+        return indentFor(this.context.next, this.base, this.pos);
     }
 }
 function isParent(parent, of) {
@@ -1279,8 +1292,12 @@ function bracketedAligned(context) {
         let next = tree.childAfter(pos);
         if (!next || next == last)
             return null;
-        if (!next.type.isSkipped)
-            return next.from < lineEnd ? openToken : null;
+        if (!next.type.isSkipped) {
+            if (next.from >= lineEnd)
+                return null;
+            let space = /^ */.exec(openLine.text.slice(openToken.to - openLine.from))[0].length;
+            return { from: openToken.from, to: openToken.to + space };
+        }
         pos = next.to;
     }
 }
@@ -1397,9 +1414,10 @@ function syntaxFolding(state, start, end) {
     let tree = syntaxTree(state);
     if (tree.length < end)
         return null;
-    let inner = tree.resolveInner(end, 1);
+    let stack = tree.resolveStack(end, 1);
     let found = null;
-    for (let cur = inner; cur; cur = cur.parent) {
+    for (let iter = stack; iter; iter = iter.next) {
+        let cur = iter.node;
         if (cur.to <= end || cur.from > end)
             continue;
         if (found && cur.from < start)
@@ -1470,6 +1488,8 @@ const foldState = /*@__PURE__*/StateField.define({
         return Decoration.none;
     },
     update(folded, tr) {
+        if (tr.isUserEvent("delete"))
+            tr.changes.iterChangedRanges((fromA, toA) => folded = clearTouchedFolds(folded, fromA, toA));
         folded = folded.map(tr.changes);
         for (let e of tr.effects) {
             if (e.is(foldEffect) && !foldExists(folded, e.value.from, e.value.to)) {
@@ -1484,17 +1504,8 @@ const foldState = /*@__PURE__*/StateField.define({
             }
         }
         // Clear folded ranges that cover the selection head
-        if (tr.selection) {
-            let onSelection = false, { head } = tr.selection.main;
-            folded.between(head, head, (a, b) => { if (a < head && b > head)
-                onSelection = true; });
-            if (onSelection)
-                folded = folded.update({
-                    filterFrom: head,
-                    filterTo: head,
-                    filter: (a, b) => b <= head || a >= head
-                });
-        }
+        if (tr.selection)
+            folded = clearTouchedFolds(folded, tr.selection.main.head);
         return folded;
     },
     provide: f => EditorView.decorations.from(f),
@@ -1516,6 +1527,16 @@ const foldState = /*@__PURE__*/StateField.define({
         return Decoration.set(ranges, true);
     }
 });
+function clearTouchedFolds(folded, from, to = from) {
+    let touched = false;
+    folded.between(from, to, (a, b) => { if (a < to && b > from)
+        touched = true; });
+    return !touched ? folded : folded.update({
+        filterFrom: from,
+        filterTo: to,
+        filter: (a, b) => a >= to || b <= from
+    });
+}
 /**
 Get a [range set](https://codemirror.net/6/docs/ref/#state.RangeSet) containing the folded ranges
 in the given state.
@@ -1732,7 +1753,7 @@ fold status indicator before foldable lines (which can be clicked
 to fold or unfold the line).
 */
 function foldGutter(config = {}) {
-    let fullConfig = Object.assign(Object.assign({}, foldGutterDefaults), config);
+    let fullConfig = { ...foldGutterDefaults, ...config };
     let canFold = new FoldMarker(fullConfig, true), canUnfold = new FoldMarker(fullConfig, false);
     let markers = ViewPlugin.fromClass(class {
         constructor(view) {
@@ -1767,7 +1788,9 @@ function foldGutter(config = {}) {
             initialSpacer() {
                 return new FoldMarker(fullConfig, false);
             },
-            domEventHandlers: Object.assign(Object.assign({}, domEventHandlers), { click: (view, line, event) => {
+            domEventHandlers: {
+                ...domEventHandlers,
+                click: (view, line, event) => {
                     if (domEventHandlers.click && domEventHandlers.click(view, line, event))
                         return true;
                     let folded = findFold(view.state, line.from, line.to);
@@ -1781,7 +1804,8 @@ function foldGutter(config = {}) {
                         return true;
                     }
                     return false;
-                } })
+                }
+            }
         }),
         codeFolding()
     ];
@@ -1908,16 +1932,20 @@ class TreeHighlighter {
         this.markCache = Object.create(null);
         this.tree = syntaxTree(view.state);
         this.decorations = this.buildDeco(view, getHighlighters(view.state));
+        this.decoratedTo = view.viewport.to;
     }
     update(update) {
         let tree = syntaxTree(update.state), highlighters = getHighlighters(update.state);
         let styleChange = highlighters != getHighlighters(update.startState);
-        if (tree.length < update.view.viewport.to && !styleChange && tree.type == this.tree.type) {
+        let { viewport } = update.view, decoratedToMapped = update.changes.mapPos(this.decoratedTo, 1);
+        if (tree.length < viewport.to && !styleChange && tree.type == this.tree.type && decoratedToMapped >= viewport.to) {
             this.decorations = this.decorations.map(update.changes);
+            this.decoratedTo = decoratedToMapped;
         }
         else if (tree != this.tree || update.viewportChanged || styleChange) {
             this.tree = tree;
             this.decorations = this.buildDeco(update.view, highlighters);
+            this.decoratedTo = viewport.to;
         }
     }
     buildDeco(view, highlighters) {
@@ -2330,7 +2358,8 @@ function fullParser(spec) {
         copyState: spec.copyState || defaultCopyState,
         indent: spec.indent || (() => null),
         languageData: spec.languageData || {},
-        tokenTable: spec.tokenTable || noTokens
+        tokenTable: spec.tokenTable || noTokens,
+        mergeTokens: spec.mergeTokens !== false
     };
 }
 function defaultCopyState(state) {
@@ -2357,8 +2386,8 @@ class StreamLanguage extends Language {
                 return new Parse(self, input, fragments, ranges);
             }
         };
-        super(data, impl, [indentService.of((cx, pos) => this.getIndent(cx, pos))], parser.name);
-        this.topNode = docID(data);
+        super(data, impl, [], parser.name);
+        this.topNode = docID(data, this);
         self = this;
         this.streamParser = p;
         this.stateAfter = new NodeProp({ perNode: true });
@@ -2368,32 +2397,30 @@ class StreamLanguage extends Language {
     Define a stream language.
     */
     static define(spec) { return new StreamLanguage(spec); }
-    getIndent(cx, pos) {
-        let tree = syntaxTree(cx.state), at = tree.resolve(pos);
-        while (at && at.type != this.topNode)
-            at = at.parent;
-        if (!at)
-            return null;
+    /**
+    @internal
+    */
+    getIndent(cx) {
         let from = undefined;
         let { overrideIndentation } = cx.options;
         if (overrideIndentation) {
             from = IndentedFrom.get(cx.state);
-            if (from != null && from < pos - 1e4)
+            if (from != null && from < cx.pos - 1e4)
                 from = undefined;
         }
-        let start = findState(this, tree, 0, at.from, from !== null && from !== void 0 ? from : pos), statePos, state;
+        let start = findState(this, cx.node.tree, cx.node.from, cx.node.from, from !== null && from !== void 0 ? from : cx.pos), statePos, state;
         if (start) {
             state = start.state;
             statePos = start.pos + 1;
         }
         else {
             state = this.streamParser.startState(cx.unit);
-            statePos = 0;
+            statePos = cx.node.from;
         }
-        if (pos - statePos > 10000 /* MaxIndentScanDist */)
+        if (cx.pos - statePos > 10000 /* C.MaxIndentScanDist */)
             return null;
-        while (statePos < pos) {
-            let line = cx.state.doc.lineAt(statePos), end = Math.min(pos, line.to);
+        while (statePos < cx.pos) {
+            let line = cx.state.doc.lineAt(statePos), end = Math.min(cx.pos, line.to);
             if (line.length) {
                 let indentation = overrideIndentation ? overrideIndentation(line.from) : -1;
                 let stream = new StringStream(line.text, cx.state.tabSize, cx.unit, indentation < 0 ? undefined : indentation);
@@ -2403,11 +2430,11 @@ class StreamLanguage extends Language {
             else {
                 this.streamParser.blankLine(state, cx.unit);
             }
-            if (end == pos)
+            if (end == cx.pos)
                 break;
             statePos = line.to + 1;
         }
-        let line = cx.lineAt(pos);
+        let line = cx.lineAt(cx.pos);
         if (overrideIndentation && from == null)
             IndentedFrom.set(cx.state, line.from);
         return this.streamParser.indent(state, /^\s*(.*)/.exec(line.text)[1], cx);
@@ -2429,7 +2456,7 @@ function findState(lang, tree, off, startPos, before) {
 function cutTree(lang, tree, from, to, inside) {
     if (inside && from <= 0 && to >= tree.length)
         return tree;
-    if (!inside && tree.type == lang.topNode)
+    if (!inside && from == 0 && tree.type == lang.topNode)
         inside = true;
     for (let i = tree.children.length - 1; i >= 0; i--) {
         let pos = tree.positions[i], child = tree.children[i], inner;
@@ -2442,11 +2469,11 @@ function cutTree(lang, tree, from, to, inside) {
     }
     return null;
 }
-function findStartInFragments(lang, fragments, startPos, editorState) {
+function findStartInFragments(lang, fragments, startPos, endPos, editorState) {
     for (let f of fragments) {
         let from = f.from + (f.openStart ? 25 : 0), to = f.to - (f.openEnd ? 25 : 0);
         let found = from <= startPos && to > startPos && findState(lang, f.tree, 0 - f.offset, startPos, to), tree;
-        if (found && (tree = cutTree(lang, f.tree, startPos + f.offset, found.pos + f.offset, false)))
+        if (found && found.pos <= endPos && (tree = cutTree(lang, f.tree, startPos + f.offset, found.pos + f.offset, false)))
             return { state: found.state, tree };
     }
     return { state: lang.streamParser.startState(editorState ? getIndentUnit(editorState) : 4), tree: Tree.empty };
@@ -2465,14 +2492,15 @@ class Parse {
         this.rangeIndex = 0;
         this.to = ranges[ranges.length - 1].to;
         let context = ParseContext.get(), from = ranges[0].from;
-        let { state, tree } = findStartInFragments(lang, fragments, from, context === null || context === void 0 ? void 0 : context.state);
+        let { state, tree } = findStartInFragments(lang, fragments, from, this.to, context === null || context === void 0 ? void 0 : context.state);
         this.state = state;
         this.parsedPos = this.chunkStart = from + tree.length;
         for (let i = 0; i < tree.children.length; i++) {
             this.chunks.push(tree.children[i]);
             this.chunkPos.push(tree.positions[i]);
         }
-        if (context && this.parsedPos < context.viewport.from - 100000 /* MaxDistanceBeforeViewport */) {
+        if (context && this.parsedPos < context.viewport.from - 100000 /* C.MaxDistanceBeforeViewport */ &&
+            ranges.some(r => r.from <= context.viewport.from && r.to >= context.viewport.from)) {
             this.state = this.lang.streamParser.startState(getIndentUnit(context.state));
             context.skipUntilInView(this.parsedPos, context.viewport.from);
             this.parsedPos = context.viewport.from;
@@ -2482,7 +2510,7 @@ class Parse {
     advance() {
         let context = ParseContext.get();
         let parseEnd = this.stoppedAt == null ? this.to : Math.min(this.to, this.stoppedAt);
-        let end = Math.min(parseEnd, this.chunkStart + 2048 /* ChunkSize */);
+        let end = Math.min(parseEnd, this.chunkStart + 512 /* C.ChunkSize */);
         if (context)
             end = Math.min(end, context.viewport.to);
         while (this.parsedPos < end)
@@ -2543,7 +2571,8 @@ class Parse {
         while (this.ranges[this.rangeIndex].to < this.parsedPos)
             this.rangeIndex++;
     }
-    emitToken(id, from, to, size, offset) {
+    emitToken(id, from, to, offset) {
+        let size = 4;
         if (this.ranges.length > 1) {
             offset = this.skipGapsTo(from, offset, 1);
             from += offset;
@@ -2552,7 +2581,12 @@ class Parse {
             to += offset;
             size += this.chunk.length - len0;
         }
-        this.chunk.push(id, from, to, size);
+        let last = this.chunk.length - 4;
+        if (this.lang.streamParser.mergeTokens && size == 4 && last >= 0 &&
+            this.chunk[last] == id && this.chunk[last + 2] == from)
+            this.chunk[last + 2] = to;
+        else
+            this.chunk.push(id, from, to, size);
         return offset;
     }
     parseLine(context) {
@@ -2565,8 +2599,8 @@ class Parse {
             while (!stream.eol()) {
                 let token = readToken(streamParser.token, stream, this.state);
                 if (token)
-                    offset = this.emitToken(this.lang.tokenTable.resolve(token), this.parsedPos + stream.start, this.parsedPos + stream.pos, 4, offset);
-                if (stream.start > 10000 /* MaxLineLength */)
+                    offset = this.emitToken(this.lang.tokenTable.resolve(token), this.parsedPos + stream.start, this.parsedPos + stream.pos, offset);
+                if (stream.start > 10000 /* C.MaxLineLength */)
                     break;
             }
         }
@@ -2582,7 +2616,7 @@ class Parse {
             length: this.parsedPos - this.chunkStart,
             nodeSet,
             topID: 0,
-            maxBufferLength: 2048 /* ChunkSize */,
+            maxBufferLength: 512 /* C.ChunkSize */,
             reused: this.chunkReused
         });
         tree = new Tree(tree.type, tree.children, tree.positions, tree.length, [[this.lang.stateAfter, this.lang.streamParser.copyState(this.state)]]);
@@ -2609,6 +2643,8 @@ const noTokens = /*@__PURE__*/Object.create(null);
 const typeArray = [NodeType.none];
 const nodeSet = /*@__PURE__*/new NodeSet(typeArray);
 const warned = [];
+// Cache of node types by name and tags
+const byTag = /*@__PURE__*/Object.create(null);
 const defaultTable = /*@__PURE__*/Object.create(null);
 for (let [legacyName, name] of [
     ["variable", "variableName"],
@@ -2642,39 +2678,166 @@ function warnForPart(part, msg) {
     console.warn(msg);
 }
 function createTokenType(extra, tagStr) {
-    let tag = null;
-    for (let part of tagStr.split(".")) {
-        let value = (extra[part] || tags[part]);
-        if (!value) {
-            warnForPart(part, `Unknown highlighting tag ${part}`);
+    let tags$1 = [];
+    for (let name of tagStr.split(" ")) {
+        let found = [];
+        for (let part of name.split(".")) {
+            let value = (extra[part] || tags[part]);
+            if (!value) {
+                warnForPart(part, `Unknown highlighting tag ${part}`);
+            }
+            else if (typeof value == "function") {
+                if (!found.length)
+                    warnForPart(part, `Modifier ${part} used at start of tag`);
+                else
+                    found = found.map(value);
+            }
+            else {
+                if (found.length)
+                    warnForPart(part, `Tag ${part} used as modifier`);
+                else
+                    found = Array.isArray(value) ? value : [value];
+            }
         }
-        else if (typeof value == "function") {
-            if (!tag)
-                warnForPart(part, `Modifier ${part} used at start of tag`);
-            else
-                tag = value(tag);
-        }
-        else {
-            if (tag)
-                warnForPart(part, `Tag ${part} used as modifier`);
-            else
-                tag = value;
-        }
+        for (let tag of found)
+            tags$1.push(tag);
     }
-    if (!tag)
+    if (!tags$1.length)
         return 0;
-    let name = tagStr.replace(/ /g, "_"), type = NodeType.define({
+    let name = tagStr.replace(/ /g, "_"), key = name + " " + tags$1.map(t => t.id);
+    let known = byTag[key];
+    if (known)
+        return known.id;
+    let type = byTag[key] = NodeType.define({
         id: typeArray.length,
         name,
-        props: [styleTags({ [name]: tag })]
+        props: [styleTags({ [name]: tags$1 })]
     });
     typeArray.push(type);
     return type.id;
 }
-function docID(data) {
-    let type = NodeType.define({ id: typeArray.length, name: "Document", props: [languageDataProp.add(() => data)], top: true });
+function docID(data, lang) {
+    let type = NodeType.define({ id: typeArray.length, name: "Document", props: [
+            languageDataProp.add(() => data),
+            indentNodeProp.add(() => cx => lang.getIndent(cx))
+        ], top: true });
     typeArray.push(type);
     return type;
 }
 
-export { DocInput, HighlightStyle, IndentContext, LRLanguage, Language, LanguageDescription, LanguageSupport, ParseContext, StreamLanguage, StringStream, TreeIndentContext, bracketMatching, bracketMatchingHandle, codeFolding, continuedIndent, defaultHighlightStyle, defineLanguageFacet, delimitedIndent, ensureSyntaxTree, flatIndent, foldAll, foldCode, foldEffect, foldGutter, foldInside, foldKeymap, foldNodeProp, foldService, foldState, foldable, foldedRanges, forceParsing, getIndentUnit, getIndentation, highlightingFor, indentNodeProp, indentOnInput, indentRange, indentService, indentString, indentUnit, language, languageDataProp, matchBrackets, sublanguageProp, syntaxHighlighting, syntaxParserRunning, syntaxTree, syntaxTreeAvailable, toggleFold, unfoldAll, unfoldCode, unfoldEffect };
+function buildForLine(line) {
+    return line.length <= 4096 && /[\u0590-\u05f4\u0600-\u06ff\u0700-\u08ac\ufb50-\ufdff]/.test(line);
+}
+function textHasRTL(text) {
+    for (let i = text.iter(); !i.next().done;)
+        if (buildForLine(i.value))
+            return true;
+    return false;
+}
+function changeAddsRTL(change) {
+    let added = false;
+    change.iterChanges((fA, tA, fB, tB, ins) => {
+        if (!added && textHasRTL(ins))
+            added = true;
+    });
+    return added;
+}
+const alwaysIsolate = /*@__PURE__*/Facet.define({ combine: values => values.some(x => x) });
+/**
+Make sure nodes
+[marked](https://lezer.codemirror.net/docs/ref/#common.NodeProp^isolate)
+as isolating for bidirectional text are rendered in a way that
+isolates them from the surrounding text.
+*/
+function bidiIsolates(options = {}) {
+    let extensions = [isolateMarks];
+    if (options.alwaysIsolate)
+        extensions.push(alwaysIsolate.of(true));
+    return extensions;
+}
+const isolateMarks = /*@__PURE__*/ViewPlugin.fromClass(class {
+    constructor(view) {
+        this.always = view.state.facet(alwaysIsolate) ||
+            view.textDirection != Direction.LTR ||
+            view.state.facet(EditorView.perLineTextDirection);
+        this.hasRTL = !this.always && textHasRTL(view.state.doc);
+        this.tree = syntaxTree(view.state);
+        this.decorations = this.always || this.hasRTL ? buildDeco(view, this.tree, this.always) : Decoration.none;
+    }
+    update(update) {
+        let always = update.state.facet(alwaysIsolate) ||
+            update.view.textDirection != Direction.LTR ||
+            update.state.facet(EditorView.perLineTextDirection);
+        if (!always && !this.hasRTL && changeAddsRTL(update.changes))
+            this.hasRTL = true;
+        if (!always && !this.hasRTL)
+            return;
+        let tree = syntaxTree(update.state);
+        if (always != this.always || tree != this.tree || update.docChanged || update.viewportChanged) {
+            this.tree = tree;
+            this.always = always;
+            this.decorations = buildDeco(update.view, tree, always);
+        }
+    }
+}, {
+    provide: plugin => {
+        function access(view) {
+            var _a, _b;
+            return (_b = (_a = view.plugin(plugin)) === null || _a === void 0 ? void 0 : _a.decorations) !== null && _b !== void 0 ? _b : Decoration.none;
+        }
+        return [EditorView.outerDecorations.of(access),
+            Prec.lowest(EditorView.bidiIsolatedRanges.of(access))];
+    }
+});
+function buildDeco(view, tree, always) {
+    let deco = new RangeSetBuilder();
+    let ranges = view.visibleRanges;
+    if (!always)
+        ranges = clipRTLLines(ranges, view.state.doc);
+    for (let { from, to } of ranges) {
+        tree.iterate({
+            enter: node => {
+                let iso = node.type.prop(NodeProp.isolate);
+                if (iso)
+                    deco.add(node.from, node.to, marks[iso]);
+            },
+            from, to
+        });
+    }
+    return deco.finish();
+}
+function clipRTLLines(ranges, doc) {
+    let cur = doc.iter(), pos = 0, result = [], last = null;
+    for (let { from, to } of ranges) {
+        if (last && last.to > from) {
+            from = last.to;
+            if (from >= to)
+                continue;
+        }
+        if (pos + cur.value.length < from) {
+            cur.next(from - (pos + cur.value.length));
+            pos = from;
+        }
+        for (;;) {
+            let start = pos, end = pos + cur.value.length;
+            if (!cur.lineBreak && buildForLine(cur.value)) {
+                if (last && last.to > start - 10)
+                    last.to = Math.min(to, end);
+                else
+                    result.push(last = { from: start, to: Math.min(to, end) });
+            }
+            if (end >= to)
+                break;
+            pos = end;
+            cur.next();
+        }
+    }
+    return result;
+}
+const marks = {
+    rtl: /*@__PURE__*/Decoration.mark({ class: "cm-iso", inclusive: true, attributes: { dir: "rtl" }, bidiIsolate: Direction.RTL }),
+    ltr: /*@__PURE__*/Decoration.mark({ class: "cm-iso", inclusive: true, attributes: { dir: "ltr" }, bidiIsolate: Direction.LTR }),
+    auto: /*@__PURE__*/Decoration.mark({ class: "cm-iso", inclusive: true, attributes: { dir: "auto" }, bidiIsolate: null })
+};
+
+export { DocInput, HighlightStyle, IndentContext, LRLanguage, Language, LanguageDescription, LanguageSupport, ParseContext, StreamLanguage, StringStream, TreeIndentContext, bidiIsolates, bracketMatching, bracketMatchingHandle, codeFolding, continuedIndent, defaultHighlightStyle, defineLanguageFacet, delimitedIndent, ensureSyntaxTree, flatIndent, foldAll, foldCode, foldEffect, foldGutter, foldInside, foldKeymap, foldNodeProp, foldService, foldState, foldable, foldedRanges, forceParsing, getIndentUnit, getIndentation, highlightingFor, indentNodeProp, indentOnInput, indentRange, indentService, indentString, indentUnit, language, languageDataProp, matchBrackets, sublanguageProp, syntaxHighlighting, syntaxParserRunning, syntaxTree, syntaxTreeAvailable, toggleFold, unfoldAll, unfoldCode, unfoldEffect };

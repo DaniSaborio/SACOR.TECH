@@ -7,8 +7,8 @@
 
 <extension type="plugin" group="quickicon" method="upgrade">
 	<name>PLG_QUICKICON_AKEEBABACKUP</name>
-	<version>10.0.6</version>
-	<creationDate>2025-09-01</creationDate>
+	<version>10.1.0</version>
+	<creationDate>2025-10-13</creationDate>
 	<author>Nicholas K. Dionysopoulos</author>
 	<authorEmail>nicholas@dionysopoulos.me</authorEmail>
 	<authorUrl>https://www.akeeba.com</authorUrl>

@@ -53,7 +53,7 @@ class StreamTransport extends AbstractTransport implements TransportInterface
         // If data exists let's encode it and make sure our Content-Type header is set.
         if (isset($data)) {
             // If the data is a scalar value simply add it to the stream context options.
-            if (is_scalar($data)) {
+            if (\is_scalar($data)) {
                 $options['content'] = $data;
             } else {
                 // Otherwise we need to encode the value first.
@@ -110,7 +110,13 @@ class StreamTransport extends AbstractTransport implements TransportInterface
 
         if (isset($headers)) {
             foreach ($headers as $key => $value) {
-                $headerEntries[] = $key . ': ' . $value;
+                if (\is_array($value)) {
+                    foreach ($value as $header) {
+                        $headerEntries[] = "$key: $header";
+                    }
+                } else {
+                    $headerEntries[] = "$key: $value";
+                }
             }
 
             // Add the headers string into the stream context options array.
@@ -154,7 +160,7 @@ class StreamTransport extends AbstractTransport implements TransportInterface
 
             if (!$stream) {
                 // Error but nothing from php? Create our own
-                throw new \Exception(sprintf('Could not connect to resource: %s', $uri));
+                throw new \Exception(\sprintf('Could not connect to resource: %s', $uri));
             }
         } catch (\Exception $e) {
             throw new \RuntimeException($e->getMessage());
@@ -222,6 +228,6 @@ class StreamTransport extends AbstractTransport implements TransportInterface
      */
     public static function isSupported()
     {
-        return \function_exists('fopen') && \is_callable('fopen') && ini_get('allow_url_fopen');
+        return \function_exists('fopen') && \is_callable('fopen') && \ini_get('allow_url_fopen');
     }
 }

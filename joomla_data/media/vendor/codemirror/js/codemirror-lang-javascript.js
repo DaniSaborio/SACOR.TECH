@@ -1,9 +1,9 @@
 import { parser } from '@lezer/javascript';
-import { syntaxTree, LRLanguage, indentNodeProp, continuedIndent, flatIndent, delimitedIndent, foldNodeProp, foldInside, sublanguageProp, LanguageSupport, defineLanguageFacet } from '@codemirror/language';
+import { LRLanguage, syntaxTree, indentNodeProp, foldNodeProp, continuedIndent, delimitedIndent, flatIndent, foldInside, sublanguageProp, defineLanguageFacet, LanguageSupport } from '@codemirror/language';
 import { EditorSelection } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { snippetCompletion, ifNotIn, completeFromList } from '@codemirror/autocomplete';
-import { IterMode, NodeWeakMap } from '@lezer/common';
+import { NodeWeakMap, IterMode } from '@lezer/common';
 
 /**
 A collection of JavaScript-related
@@ -150,6 +150,7 @@ const dontComplete = [
     "VariableDefinition", "TypeDefinition", "Label",
     "PropertyDefinition", "PropertyName",
     "PrivatePropertyDefinition", "PrivatePropertyName",
+    "JSXText", "JSXAttributeValue", "JSXOpenTag", "JSXCloseTag", "JSXSelfClosingTag",
     ".", "?."
 ];
 /**
@@ -301,7 +302,7 @@ const javascriptLanguage = /*@__PURE__*/LRLanguage.define({
                 Block: /*@__PURE__*/delimitedIndent({ closing: "}" }),
                 ArrowFunction: cx => cx.baseIndent + cx.unit,
                 "TemplateString BlockComment": () => null,
-                "Statement Property": /*@__PURE__*/continuedIndent({ except: /^{/ }),
+                "Statement Property": /*@__PURE__*/continuedIndent({ except: /^\s*{/ }),
                 JSXElement(context) {
                     let closed = /^\s*<\//.test(context.textAfter);
                     return context.lineIndent(context.node.from) + (closed ? 0 : context.unit);
@@ -354,7 +355,7 @@ const keywords = /*@__PURE__*/"break case const continue default delete export e
 const typescriptKeywords = /*@__PURE__*/keywords.concat(/*@__PURE__*/["declare", "implements", "private", "protected", "public"].map(kwCompletion));
 /**
 JavaScript support. Includes [snippet](https://codemirror.net/6/docs/ref/#lang-javascript.snippets)
-completion.
+and local variable completion.
 */
 function javascript(config = {}) {
     let lang = config.jsx ? (config.typescript ? tsxLanguage : jsxLanguage)
@@ -417,7 +418,7 @@ const autoCloseTags = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, t
         }
         else if (text == ">") {
             let openTag = findOpenTag(around);
-            if (openTag &&
+            if (openTag && openTag.name == "JSXOpenTag" &&
                 !/^\/?>|^<\//.test(state.doc.sliceString(head, head + 2)) &&
                 (name = elementName(state.doc, openTag, head)))
                 return { range, changes: { from: head, insert: `</${name}>` } };
@@ -455,7 +456,8 @@ function esLint(eslint, config) {
             rules: {}
         };
         eslint.getRules().forEach((desc, name) => {
-            if (desc.meta.docs.recommended)
+            var _a;
+            if ((_a = desc.meta.docs) === null || _a === void 0 ? void 0 : _a.recommended)
                 config.rules[name] = 2;
         });
     }

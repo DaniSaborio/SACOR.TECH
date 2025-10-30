@@ -81,7 +81,12 @@ class Socket extends AbstractTransport
         }
 
         // Configure protocol version, use transport's default if not set otherwise.
-        $protocolVersion = $this->getOption('protocolVersion', '1.1');
+        $protocolVersion = $this->getOption('protocolVersion', '1.0');
+
+        // HTTP/1.1 streams using the socket wrapper require a Connection: close header
+        if ($protocolVersion == '1.1' && !isset($headers['Connection'])) {
+            $headers['Connection'] = 'close';
+        }
 
         // Build the request payload.
         $request   = [];

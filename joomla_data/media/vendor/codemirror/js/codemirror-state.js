@@ -1,3 +1,84 @@
+// These are filled with ranges (rangeFrom[i] up to but not including
+// rangeTo[i]) of code points that count as extending characters.
+let rangeFrom = [], rangeTo = []
+
+;(() => {
+  // Compressed representation of the Grapheme_Cluster_Break=Extend
+  // information from
+  // http://www.unicode.org/Public/16.0.0/ucd/auxiliary/GraphemeBreakProperty.txt.
+  // Each pair of elements represents a range, as an offet from the
+  // previous range and a length. Numbers are in base-36, with the empty
+  // string being a shorthand for 1.
+  let numbers = "lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,3b,f,,w,1j,,,,4,8,4,,3,7,a,2,t,,1m,,,,2,4,8,,9,,a,2,q,,2,2,1l,,4,2,4,2,2,3,3,,u,2,3,,b,2,1l,,4,5,,2,4,,k,2,m,6,,,1m,,,2,,4,8,,7,3,a,2,u,,1n,,,,c,,9,,14,,3,,1l,3,5,3,,4,7,2,b,2,t,,1m,,2,,2,,3,,5,2,7,2,b,2,s,2,1l,2,,,2,4,8,,9,,a,2,t,,20,,4,,2,3,,,8,,29,,2,7,c,8,2q,,2,9,b,6,22,2,r,,,,,,1j,e,,5,,2,5,b,,10,9,,2u,4,,6,,2,2,2,p,2,4,3,g,4,d,,2,2,6,,f,,jj,3,qa,3,t,3,t,2,u,2,1s,2,,7,8,,2,b,9,,19,3,3b,2,y,,3a,3,4,2,9,,6,3,63,2,2,,1m,,,7,,,,,2,8,6,a,2,,1c,h,1r,4,1c,7,,,5,,14,9,c,2,w,4,2,2,,3,1k,,,2,3,,,3,1m,8,2,2,48,3,,d,,7,4,,6,,3,2,5i,1m,,5,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,p,2,5,,47,2,q,i,d,,12,8,p,b,1a,3,1c,,2,4,2,2,13,,1v,6,2,2,2,2,c,,8,,1b,,1f,,,3,2,2,5,2,,,16,2,8,,6m,,2,,4,,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,ar,2,49,b,4w,,1i,f,1k,3,1d,4,2,2,1x,3,10,5,,8,1q,,c,2,1g,9,a,4,2,,2n,3,2,,,2,6,,4g,,3,8,l,2,1l,2,,,,,m,,e,7,3,5,5f,8,2,3,,,n,,29,,2,6,,,2,,,2,,2,6j,,2,4,6,2,,2,r,2,2d,8,2,,,2,2y,,,,2,6,,,2t,3,2,4,,5,77,9,,2,6t,,a,2,,,4,,40,4,2,2,4,,w,a,14,6,2,4,8,,9,6,2,3,1a,d,,2,ba,7,,6,,,2a,m,2,7,,2,,2,3e,6,3,,,2,,7,,,20,2,3,,,,9n,2,f0b,5,1n,7,t4,,1r,4,29,,f5k,2,43q,,,3,4,5,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,79,7,c5,4,15s,7,31,7,240,5,gx7k,2o,3k,6o".split(",").map(s => s ? parseInt(s, 36) : 1);
+  for (let i = 0, n = 0; i < numbers.length; i++)
+    (i % 2 ? rangeTo : rangeFrom).push(n = n + numbers[i]);
+})();
+
+function isExtendingChar(code) {
+  if (code < 768) return false
+  for (let from = 0, to = rangeFrom.length;;) {
+    let mid = (from + to) >> 1;
+    if (code < rangeFrom[mid]) to = mid;
+    else if (code >= rangeTo[mid]) from = mid + 1;
+    else return true
+    if (from == to) return false
+  }
+}
+
+function isRegionalIndicator(code) {
+  return code >= 0x1F1E6 && code <= 0x1F1FF
+}
+
+const ZWJ = 0x200d;
+
+function findClusterBreak$1(str, pos, forward = true, includeExtending = true) {
+  return (forward ? nextClusterBreak : prevClusterBreak)(str, pos, includeExtending)
+}
+
+function nextClusterBreak(str, pos, includeExtending) {
+  if (pos == str.length) return pos
+  // If pos is in the middle of a surrogate pair, move to its start
+  if (pos && surrogateLow$1(str.charCodeAt(pos)) && surrogateHigh$1(str.charCodeAt(pos - 1))) pos--;
+  let prev = codePointAt$1(str, pos);
+  pos += codePointSize$1(prev);
+  while (pos < str.length) {
+    let next = codePointAt$1(str, pos);
+    if (prev == ZWJ || next == ZWJ || includeExtending && isExtendingChar(next)) {
+      pos += codePointSize$1(next);
+      prev = next;
+    } else if (isRegionalIndicator(next)) {
+      let countBefore = 0, i = pos - 2;
+      while (i >= 0 && isRegionalIndicator(codePointAt$1(str, i))) { countBefore++; i -= 2; }
+      if (countBefore % 2 == 0) break
+      else pos += 2;
+    } else {
+      break
+    }
+  }
+  return pos
+}
+
+function prevClusterBreak(str, pos, includeExtending) {
+  while (pos > 0) {
+    let found = nextClusterBreak(str, pos - 2, includeExtending);
+    if (found < pos) return found
+    pos--;
+  }
+  return 0
+}
+
+function codePointAt$1(str, pos) {
+  let code0 = str.charCodeAt(pos);
+  if (!surrogateHigh$1(code0) || pos + 1 == str.length) return code0
+  let code1 = str.charCodeAt(pos + 1);
+  if (!surrogateLow$1(code1)) return code0
+  return ((code0 - 0xd800) << 10) + (code1 - 0xdc00) + 0x10000
+}
+
+function surrogateLow$1(ch) { return ch >= 0xDC00 && ch < 0xE000 }
+function surrogateHigh$1(ch) { return ch >= 0xD800 && ch < 0xDC00 }
+function codePointSize$1(code) { return code < 0x10000 ? 1 : 2 }
+
 /**
 The data structure for documents. @nonabstract
 */
@@ -22,6 +103,7 @@ class Text {
     Replace a range of the text with the given content.
     */
     replace(from, to, text) {
+        [from, to] = clip(this, from, to);
         let parts = [];
         this.decompose(0, from, parts, 2 /* Open.To */);
         if (text.length)
@@ -39,6 +121,7 @@ class Text {
     Retrieve the text between the given points.
     */
     slice(from, to = this.length) {
+        [from, to] = clip(this, from, to);
         let parts = [];
         this.decompose(from, to, parts, 0);
         return TextNode.from(parts, to - from);
@@ -165,6 +248,7 @@ class TextLeaf extends Text {
     replace(from, to, text) {
         if (!(text instanceof TextLeaf))
             return super.replace(from, to, text);
+        [from, to] = clip(this, from, to);
         let lines = appendText(this.text, appendText(text.text, sliceText(this.text, 0, from)), to);
         let newLen = this.length + text.length - (to - from);
         if (lines.length <= 32 /* Tree.Branch */)
@@ -172,6 +256,7 @@ class TextLeaf extends Text {
         return TextNode.from(TextLeaf.split(lines, []), newLen);
     }
     sliceString(from, to = this.length, lineSep = "\n") {
+        [from, to] = clip(this, from, to);
         let result = "";
         for (let pos = 0, i = 0; pos <= to && i < this.text.length; i++) {
             let line = this.text[i], end = pos + line.length;
@@ -240,6 +325,7 @@ class TextNode extends Text {
         }
     }
     replace(from, to, text) {
+        [from, to] = clip(this, from, to);
         if (text.lines < this.lines)
             for (let i = 0, pos = 0; i < this.children.length; i++) {
                 let child = this.children[i], end = pos + child.length;
@@ -262,6 +348,7 @@ class TextNode extends Text {
         return super.replace(from, to, text);
     }
     sliceString(from, to = this.length, lineSep = "\n") {
+        [from, to] = clip(this, from, to);
         let result = "";
         for (let i = 0, pos = 0; i < this.children.length && pos <= to; i++) {
             let child = this.children[i], end = pos + child.length;
@@ -483,7 +570,11 @@ class LineCursor {
     }
     next(skip = 0) {
         let { done, lineBreak, value } = this.inner.next(skip);
-        if (done) {
+        if (done && this.afterBreak) {
+            this.value = "";
+            this.afterBreak = false;
+        }
+        else if (done) {
             this.done = true;
             this.value = "";
         }
@@ -545,27 +636,11 @@ class Line {
     */
     get length() { return this.to - this.from; }
 }
+function clip(text, from, to) {
+    from = Math.max(0, Math.min(text.length, from));
+    return [from, Math.max(from, Math.min(text.length, to))];
+}
 
-// Compressed representation of the Grapheme_Cluster_Break=Extend
-// information from
-// http://www.unicode.org/Public/13.0.0/ucd/auxiliary/GraphemeBreakProperty.txt.
-// Each pair of elements represents a range, as an offet from the
-// previous range and a length. Numbers are in base-36, with the empty
-// string being a shorthand for 1.
-let extend = /*@__PURE__*/"lc,34,7n,7,7b,19,,,,2,,2,,,20,b,1c,l,g,,2t,7,2,6,2,2,,4,z,,u,r,2j,b,1m,9,9,,o,4,,9,,3,,5,17,3,3b,f,,w,1j,,,,4,8,4,,3,7,a,2,t,,1m,,,,2,4,8,,9,,a,2,q,,2,2,1l,,4,2,4,2,2,3,3,,u,2,3,,b,2,1l,,4,5,,2,4,,k,2,m,6,,,1m,,,2,,4,8,,7,3,a,2,u,,1n,,,,c,,9,,14,,3,,1l,3,5,3,,4,7,2,b,2,t,,1m,,2,,2,,3,,5,2,7,2,b,2,s,2,1l,2,,,2,4,8,,9,,a,2,t,,20,,4,,2,3,,,8,,29,,2,7,c,8,2q,,2,9,b,6,22,2,r,,,,,,1j,e,,5,,2,5,b,,10,9,,2u,4,,6,,2,2,2,p,2,4,3,g,4,d,,2,2,6,,f,,jj,3,qa,3,t,3,t,2,u,2,1s,2,,7,8,,2,b,9,,19,3,3b,2,y,,3a,3,4,2,9,,6,3,63,2,2,,1m,,,7,,,,,2,8,6,a,2,,1c,h,1r,4,1c,7,,,5,,14,9,c,2,w,4,2,2,,3,1k,,,2,3,,,3,1m,8,2,2,48,3,,d,,7,4,,6,,3,2,5i,1m,,5,ek,,5f,x,2da,3,3x,,2o,w,fe,6,2x,2,n9w,4,,a,w,2,28,2,7k,,3,,4,,p,2,5,,47,2,q,i,d,,12,8,p,b,1a,3,1c,,2,4,2,2,13,,1v,6,2,2,2,2,c,,8,,1b,,1f,,,3,2,2,5,2,,,16,2,8,,6m,,2,,4,,fn4,,kh,g,g,g,a6,2,gt,,6a,,45,5,1ae,3,,2,5,4,14,3,4,,4l,2,fx,4,ar,2,49,b,4w,,1i,f,1k,3,1d,4,2,2,1x,3,10,5,,8,1q,,c,2,1g,9,a,4,2,,2n,3,2,,,2,6,,4g,,3,8,l,2,1l,2,,,,,m,,e,7,3,5,5f,8,2,3,,,n,,29,,2,6,,,2,,,2,,2,6j,,2,4,6,2,,2,r,2,2d,8,2,,,2,2y,,,,2,6,,,2t,3,2,4,,5,77,9,,2,6t,,a,2,,,4,,40,4,2,2,4,,w,a,14,6,2,4,8,,9,6,2,3,1a,d,,2,ba,7,,6,,,2a,m,2,7,,2,,2,3e,6,3,,,2,,7,,,20,2,3,,,,9n,2,f0b,5,1n,7,t4,,1r,4,29,,f5k,2,43q,,,3,4,5,8,8,2,7,u,4,44,3,1iz,1j,4,1e,8,,e,,m,5,,f,11s,7,,h,2,7,,2,,5,79,7,c5,4,15s,7,31,7,240,5,gx7k,2o,3k,6o".split(",").map(s => s ? parseInt(s, 36) : 1);
-// Convert offsets into absolute values
-for (let i = 1; i < extend.length; i++)
-    extend[i] += extend[i - 1];
-function isExtendingChar(code) {
-    for (let i = 1; i < extend.length; i += 2)
-        if (extend[i] > code)
-            return extend[i - 1] <= code;
-    return false;
-}
-function isRegionalIndicator(code) {
-    return code >= 0x1F1E6 && code <= 0x1F1FF;
-}
-const ZWJ = 0x200d;
 /**
 Returns a next grapheme cluster break _after_ (not equal to)
 `pos`, if `forward` is true, or before otherwise. Returns `pos`
@@ -575,47 +650,7 @@ Moves across surrogate pairs, extending characters (when
 joiners, and flag emoji.
 */
 function findClusterBreak(str, pos, forward = true, includeExtending = true) {
-    return (forward ? nextClusterBreak : prevClusterBreak)(str, pos, includeExtending);
-}
-function nextClusterBreak(str, pos, includeExtending) {
-    if (pos == str.length)
-        return pos;
-    // If pos is in the middle of a surrogate pair, move to its start
-    if (pos && surrogateLow(str.charCodeAt(pos)) && surrogateHigh(str.charCodeAt(pos - 1)))
-        pos--;
-    let prev = codePointAt(str, pos);
-    pos += codePointSize(prev);
-    while (pos < str.length) {
-        let next = codePointAt(str, pos);
-        if (prev == ZWJ || next == ZWJ || includeExtending && isExtendingChar(next)) {
-            pos += codePointSize(next);
-            prev = next;
-        }
-        else if (isRegionalIndicator(next)) {
-            let countBefore = 0, i = pos - 2;
-            while (i >= 0 && isRegionalIndicator(codePointAt(str, i))) {
-                countBefore++;
-                i -= 2;
-            }
-            if (countBefore % 2 == 0)
-                break;
-            else
-                pos += 2;
-        }
-        else {
-            break;
-        }
-    }
-    return pos;
-}
-function prevClusterBreak(str, pos, includeExtending) {
-    while (pos > 0) {
-        let found = nextClusterBreak(str, pos - 2, includeExtending);
-        if (found < pos)
-            return found;
-        pos--;
-    }
-    return 0;
+    return findClusterBreak$1(str, pos, forward, includeExtending);
 }
 function surrogateLow(ch) { return ch >= 0xDC00 && ch < 0xE000; }
 function surrogateHigh(ch) { return ch >= 0xD800 && ch < 0xDC00; }
@@ -645,7 +680,7 @@ function fromCodePoint(code) {
     return String.fromCharCode((code >> 10) + 0xd800, (code & 1023) + 0xdc00);
 }
 /**
-The amount of positions a character takes up a JavaScript string.
+The amount of positions a character takes up in a JavaScript string.
 */
 function codePointSize(code) { return code < 0x10000 ? 1 : 2; }
 
@@ -774,7 +809,7 @@ class ChangeDesc {
     Map this description, which should start with the same document
     as `other`, over another set of changes, so that it can be
     applied after it. When `before` is true, map as if the changes
-    in `other` happened before the ones in `this`.
+    in `this` happened before the ones in `other`.
     */
     mapDesc(other, before = false) { return other.empty ? this : mapSet(this, other, before); }
     mapPos(pos, assoc = -1, mode = MapMode.Simple) {
@@ -1077,7 +1112,7 @@ function addSection(sections, len, ins, forceJoin = false) {
     let last = sections.length - 2;
     if (last >= 0 && ins <= 0 && ins == sections[last + 1])
         sections[last] += len;
-    else if (len == 0 && sections[last] == 0)
+    else if (last >= 0 && len == 0 && sections[last] == 0)
         sections[last + 1] += ins;
     else if (forceJoin) {
         sections[last] += len;
@@ -1135,7 +1170,10 @@ function mapSet(setA, setB, before, mkSet = false) {
     // content has been inserted already, and refers to the section
     // index.
     for (let inserted = -1;;) {
-        if (a.ins == -1 && b.ins == -1) {
+        if (a.done && b.len || b.done && a.len) {
+            throw new Error("Mismatched change set lengths");
+        }
+        else if (a.ins == -1 && b.ins == -1) {
             // Move across ranges skipped by both sets.
             let len = Math.min(a.len, b.len);
             addSection(sections, len, -1);
@@ -1312,12 +1350,12 @@ class SelectionRange {
     The anchor of the range—the side that doesn't move when you
     extend it.
     */
-    get anchor() { return this.flags & 16 /* RangeFlag.Inverted */ ? this.to : this.from; }
+    get anchor() { return this.flags & 32 /* RangeFlag.Inverted */ ? this.to : this.from; }
     /**
     The head of the range, which is moved when the range is
     [extended](https://codemirror.net/6/docs/ref/#state.SelectionRange.extend).
     */
-    get head() { return this.flags & 16 /* RangeFlag.Inverted */ ? this.from : this.to; }
+    get head() { return this.flags & 32 /* RangeFlag.Inverted */ ? this.from : this.to; }
     /**
     True when `anchor` and `head` are at the same position.
     */
@@ -1328,14 +1366,14 @@ class SelectionRange {
     the character before its position, 1 the character after, and 0
     means no association.
     */
-    get assoc() { return this.flags & 4 /* RangeFlag.AssocBefore */ ? -1 : this.flags & 8 /* RangeFlag.AssocAfter */ ? 1 : 0; }
+    get assoc() { return this.flags & 8 /* RangeFlag.AssocBefore */ ? -1 : this.flags & 16 /* RangeFlag.AssocAfter */ ? 1 : 0; }
     /**
     The bidirectional text level associated with this cursor, if
     any.
     */
     get bidiLevel() {
-        let level = this.flags & 3 /* RangeFlag.BidiLevelMask */;
-        return level == 3 ? null : level;
+        let level = this.flags & 7 /* RangeFlag.BidiLevelMask */;
+        return level == 7 ? null : level;
     }
     /**
     The goal column (stored vertical offset) associated with a
@@ -1344,8 +1382,8 @@ class SelectionRange {
     lines of different length.
     */
     get goalColumn() {
-        let value = this.flags >> 5 /* RangeFlag.GoalColumnOffset */;
-        return value == 33554431 /* RangeFlag.NoGoalColumn */ ? undefined : value;
+        let value = this.flags >> 6 /* RangeFlag.GoalColumnOffset */;
+        return value == 16777215 /* RangeFlag.NoGoalColumn */ ? undefined : value;
     }
     /**
     Map this range through a change, producing a valid range in the
@@ -1374,8 +1412,9 @@ class SelectionRange {
     /**
     Compare this range to another range.
     */
-    eq(other) {
-        return this.anchor == other.anchor && this.head == other.head;
+    eq(other, includeAssoc = false) {
+        return this.anchor == other.anchor && this.head == other.head &&
+            (!includeAssoc || !this.empty || this.assoc == other.assoc);
     }
     /**
     Return a JSON-serializable object representing the range.
@@ -1425,14 +1464,17 @@ class EditorSelection {
         return EditorSelection.create(this.ranges.map(r => r.map(change, assoc)), this.mainIndex);
     }
     /**
-    Compare this selection to another selection.
+    Compare this selection to another selection. By default, ranges
+    are compared only by position. When `includeAssoc` is true,
+    cursor ranges must also have the same
+    [`assoc`](https://codemirror.net/6/docs/ref/#state.SelectionRange.assoc) value.
     */
-    eq(other) {
+    eq(other, includeAssoc = false) {
         if (this.ranges.length != other.ranges.length ||
             this.mainIndex != other.mainIndex)
             return false;
         for (let i = 0; i < this.ranges.length; i++)
-            if (!this.ranges[i].eq(other.ranges[i]))
+            if (!this.ranges[i].eq(other.ranges[i], includeAssoc))
                 return false;
         return true;
     }
@@ -1505,18 +1547,18 @@ class EditorSelection {
     safely ignore the optional arguments in most situations.
     */
     static cursor(pos, assoc = 0, bidiLevel, goalColumn) {
-        return SelectionRange.create(pos, pos, (assoc == 0 ? 0 : assoc < 0 ? 4 /* RangeFlag.AssocBefore */ : 8 /* RangeFlag.AssocAfter */) |
-            (bidiLevel == null ? 3 : Math.min(2, bidiLevel)) |
-            ((goalColumn !== null && goalColumn !== void 0 ? goalColumn : 33554431 /* RangeFlag.NoGoalColumn */) << 5 /* RangeFlag.GoalColumnOffset */));
+        return SelectionRange.create(pos, pos, (assoc == 0 ? 0 : assoc < 0 ? 8 /* RangeFlag.AssocBefore */ : 16 /* RangeFlag.AssocAfter */) |
+            (bidiLevel == null ? 7 : Math.min(6, bidiLevel)) |
+            ((goalColumn !== null && goalColumn !== void 0 ? goalColumn : 16777215 /* RangeFlag.NoGoalColumn */) << 6 /* RangeFlag.GoalColumnOffset */));
     }
     /**
     Create a selection range.
     */
     static range(anchor, head, goalColumn, bidiLevel) {
-        let flags = ((goalColumn !== null && goalColumn !== void 0 ? goalColumn : 33554431 /* RangeFlag.NoGoalColumn */) << 5 /* RangeFlag.GoalColumnOffset */) |
-            (bidiLevel == null ? 3 : Math.min(2, bidiLevel));
-        return head < anchor ? SelectionRange.create(head, anchor, 16 /* RangeFlag.Inverted */ | 8 /* RangeFlag.AssocAfter */ | flags)
-            : SelectionRange.create(anchor, head, (head > anchor ? 4 /* RangeFlag.AssocBefore */ : 0) | flags);
+        let flags = ((goalColumn !== null && goalColumn !== void 0 ? goalColumn : 16777215 /* RangeFlag.NoGoalColumn */) << 6 /* RangeFlag.GoalColumnOffset */) |
+            (bidiLevel == null ? 7 : Math.min(6, bidiLevel));
+        return head < anchor ? SelectionRange.create(head, anchor, 32 /* RangeFlag.Inverted */ | 16 /* RangeFlag.AssocAfter */ | flags)
+            : SelectionRange.create(anchor, head, (head > anchor ? 8 /* RangeFlag.AssocBefore */ : 0) | flags);
     }
     /**
     @internal
@@ -1553,6 +1595,9 @@ Examples of uses of facets are the [tab
 size](https://codemirror.net/6/docs/ref/#state.EditorState^tabSize), [editor
 attributes](https://codemirror.net/6/docs/ref/#view.EditorView^editorAttributes), and [update
 listeners](https://codemirror.net/6/docs/ref/#view.EditorView^updateListener).
+
+Note that `Facet` instances can be used anywhere where
+[`FacetReader`](https://codemirror.net/6/docs/ref/#state.FacetReader) is expected.
 */
 class Facet {
     constructor(
@@ -1579,6 +1624,11 @@ class Facet {
         this.default = combine([]);
         this.extensions = typeof enables == "function" ? enables(this) : enables;
     }
+    /**
+    Returns a facet reader for this facet, which can be used to
+    [read](https://codemirror.net/6/docs/ref/#state.EditorState.facet) it but not to define values for it.
+    */
+    get reader() { return this; }
     /**
     Define a new facet.
     */
@@ -1803,6 +1853,11 @@ class StateField {
                 return 1 /* SlotStatus.Changed */;
             },
             reconfigure: (state, oldState) => {
+                let init = state.facet(initField), oldInit = oldState.facet(initField), reInit;
+                if ((reInit = init.find(i => i.field == this)) && reInit != oldInit.find(i => i.field == this)) {
+                    state.values[idx] = reInit.create(state);
+                    return 1 /* SlotStatus.Changed */;
+                }
                 if (oldState.config.address[this.id] != null) {
                     state.values[idx] = oldState.field(this);
                     return 0;
@@ -2631,7 +2686,8 @@ class EditorState {
         else {
             startValues = tr.startState.values.slice();
         }
-        new EditorState(conf, tr.newDoc, tr.newSelection, startValues, (state, slot) => slot.update(state, tr), tr);
+        let selection = tr.startState.facet(allowMultipleSelections) ? tr.newSelection : tr.newSelection.asSingle();
+        new EditorState(conf, tr.newDoc, selection, startValues, (state, slot) => slot.update(state, tr), tr);
     }
     /**
     Create a [transaction spec](https://codemirror.net/6/docs/ref/#state.TransactionSpec) that
@@ -3094,7 +3150,7 @@ class Chunk {
         }
     }
     between(offset, from, to, f) {
-        for (let i = this.findIndex(from, -1000000000 /* C.Far */, true), e = this.findIndex(to, 1000000000 /* C.Far */, false, i); i < e; i++)
+        for (let i = this.findIndex(from, -1e9 /* C.Far */, true), e = this.findIndex(to, 1000000000 /* C.Far */, false, i); i < e; i++)
             if (f(this.from[i] + offset, this.to[i] + offset, this.value[i]) === false)
                 return false;
     }
@@ -3365,7 +3421,9 @@ class RangeSet {
             let curTo = Math.min(cursor.to, to);
             if (cursor.point) {
                 let active = cursor.activeForPoint(cursor.to);
-                let openCount = cursor.pointFrom < from ? active.length + 1 : Math.min(active.length, openRanges);
+                let openCount = cursor.pointFrom < from ? active.length + 1
+                    : cursor.point.startSide < 0 ? active.length
+                        : Math.min(active.length, openRanges);
                 iterator.point(pos, curTo, cursor.point, active, openCount, cursor.pointRank);
                 openRanges = Math.min(cursor.openEnd(curTo), active.length);
             }
@@ -3391,6 +3449,19 @@ class RangeSet {
         for (let range of ranges instanceof Range ? [ranges] : sort ? lazySort(ranges) : ranges)
             build.add(range.from, range.to, range.value);
         return build.finish();
+    }
+    /**
+    Join an array of range sets into a single set.
+    */
+    static join(sets) {
+        if (!sets.length)
+            return RangeSet.empty;
+        let result = sets[sets.length - 1];
+        for (let i = sets.length - 2; i >= 0; i--) {
+            for (let layer = sets[i]; layer != RangeSet.empty; layer = layer.nextLayer)
+                result = new RangeSet(layer.chunkPos, layer.chunk, result, Math.max(layer.maxPoint, result.maxPoint));
+        }
+        return result;
     }
 }
 /**
@@ -3434,8 +3505,8 @@ class RangeSetBuilder {
         this.chunkPos = [];
         this.chunkStart = -1;
         this.last = null;
-        this.lastFrom = -1000000000 /* C.Far */;
-        this.lastTo = -1000000000 /* C.Far */;
+        this.lastFrom = -1e9 /* C.Far */;
+        this.lastTo = -1e9 /* C.Far */;
         this.from = [];
         this.to = [];
         this.value = [];
@@ -3534,7 +3605,7 @@ class LayerCursor {
     }
     get startSide() { return this.value ? this.value.startSide : 0; }
     get endSide() { return this.value ? this.value.endSide : 0; }
-    goto(pos, side = -1000000000 /* C.Far */) {
+    goto(pos, side = -1e9 /* C.Far */) {
         this.chunkIndex = this.rangeIndex = 0;
         this.gotoInner(pos, side, false);
         return this;
@@ -3617,7 +3688,7 @@ class HeapCursor {
         return heap.length == 1 ? heap[0] : new HeapCursor(heap);
     }
     get startSide() { return this.value ? this.value.startSide : 0; }
-    goto(pos, side = -1000000000 /* C.Far */) {
+    goto(pos, side = -1e9 /* C.Far */) {
         for (let cur of this.heap)
             cur.goto(pos, side);
         for (let i = this.heap.length >> 1; i >= 0; i--)
@@ -3679,14 +3750,14 @@ class SpanCursor {
         this.point = null;
         this.pointFrom = 0;
         this.pointRank = 0;
-        this.to = -1000000000 /* C.Far */;
+        this.to = -1e9 /* C.Far */;
         this.endSide = 0;
         // The amount of open active ranges at the start of the iterator.
         // Not including points.
         this.openStart = -1;
         this.cursor = HeapCursor.from(sets, skip, minPoint);
     }
-    goto(pos, side = -1000000000 /* C.Far */) {
+    goto(pos, side = -1e9 /* C.Far */) {
         this.cursor.goto(pos, side);
         this.active.length = this.activeTo.length = this.activeRank.length = 0;
         this.minActive = -1;
@@ -3709,7 +3780,8 @@ class SpanCursor {
     }
     addActive(trackOpen) {
         let i = 0, { value, to, rank } = this.cursor;
-        while (i < this.activeRank.length && this.activeRank[i] <= rank)
+        // Organize active marks by rank first, then by size
+        while (i < this.activeRank.length && (rank - this.activeRank[i] || to - this.activeTo[i]) > 0)
             i++;
         insert(this.active, i, value);
         insert(this.activeTo, i, to);
@@ -3798,7 +3870,7 @@ function compare(a, startA, b, startB, length, comparator) {
     let endB = startB + length;
     let pos = startB, dPos = startB - startA;
     for (;;) {
-        let diff = (a.to + dPos) - b.to || a.endSide - b.endSide;
+        let dEnd = (a.to + dPos) - b.to, diff = dEnd || a.endSide - b.endSide;
         let end = diff < 0 ? a.to + dPos : b.to, clipEnd = Math.min(end, endB);
         if (a.point || b.point) {
             if (!(a.point && b.point && (a.point == b.point || a.point.eq(b.point)) &&
@@ -3811,6 +3883,8 @@ function compare(a, startA, b, startB, length, comparator) {
         }
         if (end > endB)
             break;
+        if ((dEnd || a.openEnd != b.openEnd) && comparator.boundChange)
+            comparator.boundChange(end);
         pos = end;
         if (diff <= 0)
             a.next();
@@ -3852,7 +3926,7 @@ taking extending characters and tab size into account.
 */
 function countColumn(string, tabSize, to = string.length) {
     let n = 0;
-    for (let i = 0; i < to;) {
+    for (let i = 0; i < to && i < string.length;) {
         if (string.charCodeAt(i) == 9) {
             n += tabSize - (n % tabSize);
             i++;

@@ -11,15 +11,12 @@
    * and closes the select frame.
    */
   window.jSelectMenuItem = (id, title, uri, object, link, lang) => {
-    // eslint-disable-next-line no-console
     console.warn('Method jSelectMenuItem() is deprecated. Use postMessage() instead.');
     let thislang = '';
     if (!Joomla.getOptions('xtd-menus')) {
       // Something went wrong!
       return;
     }
-
-    // eslint-disable-next-line prefer-destructuring
     const editor = Joomla.getOptions('xtd-menus').editor;
     if (lang !== '') {
       thislang = '&lang=';
@@ -40,8 +37,7 @@
   };
 
   // Get the elements
-  const elements = [].slice.call(document.querySelectorAll('.select-link'));
-  elements.forEach(element => {
+  document.querySelectorAll('.select-link').forEach(element => {
     // Listen for click event
     element.addEventListener('click', event => {
       event.preventDefault();

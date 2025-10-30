@@ -1,10 +1,20 @@
 {
   "$schema": "https://developer.joomla.org/schemas/json-schema/web_assets.json",
   "name": "joomla",
-  "version": "5.0.3",
+  "version": "5.4.0",
   "description": "Joomla CMS",
   "license": "GPL-2.0-or-later",
   "assets": [
+    {
+      "name": "short-and-sweet",
+      "type": "script",
+      "uri": "vendor/short-and-sweet/short-and-sweet.min.js",
+      "attributes": {
+        "type": "module"
+      },
+      "package": "short-and-sweet",
+      "version": "1.0.4"
+    },
     {
       "name": "diff",
       "type": "script",
@@ -13,7 +23,7 @@
         "defer": true
       },
       "package": "diff",
-      "version": "5.1.0"
+      "version": "5.2.0"
     },
     {
       "name": "es-module-shims",
@@ -23,7 +33,7 @@
         "async": true
       },
       "package": "es-module-shims",
-      "version": "1.8.0"
+      "version": "1.10.1"
     },
     {
       "name": "wcpolyfill",
@@ -50,21 +60,11 @@
       "version": "3.0.17"
     },
     {
-      "name": "short-and-sweet",
-      "type": "script",
-      "uri": "vendor/short-and-sweet/short-and-sweet.min.js",
-      "attributes": {
-        "defer": true
-      },
-      "package": "short-and-sweet",
-      "version": "1.0.4"
-    },
-    {
       "name": "awesomplete",
       "type": "style",
       "uri": "vendor/awesomplete/awesomplete.css",
       "package": "awesomplete",
-      "version": "1.1.5"
+      "version": "1.1.7"
     },
     {
       "name": "awesomplete",
@@ -74,7 +74,7 @@
         "defer": true
       },
       "package": "awesomplete",
-      "version": "1.1.5"
+      "version": "1.1.7"
     },
     {
       "name": "awesomplete",
@@ -84,14 +84,14 @@
         "awesomplete#script"
       ],
       "package": "awesomplete",
-      "version": "1.1.5"
+      "version": "1.1.7"
     },
     {
       "name": "cropperjs",
       "type": "style",
       "uri": "vendor/cropperjs/cropper.min.css",
       "package": "cropperjs",
-      "version": "1.6.1"
+      "version": "1.6.2"
     },
     {
       "name": "cropper-module",
@@ -99,7 +99,7 @@
       "uri": "vendor/cropperjs/cropper.esm.js",
       "importmap": true,
       "package": "cropperjs",
-      "version": "1.6.1"
+      "version": "1.6.2"
     },
     {
       "name": "cropperjs",
@@ -110,7 +110,7 @@
         "defer": true
       },
       "package": "cropperjs",
-      "version": "1.6.1"
+      "version": "1.6.2"
     },
     {
       "name": "cropperjs",
@@ -120,7 +120,7 @@
         "cropperjs#script"
       ],
       "package": "cropperjs",
-      "version": "1.6.1"
+      "version": "1.6.2"
     },
     {
       "name": "choicesjs",
@@ -181,24 +181,7 @@
       "type": "script",
       "uri": "vendor/focus-visible/focus-visible.min.js",
       "package": "focus-visible",
-      "version": "5.2.0"
-    },
-    {
-      "name": "jquery",
-      "type": "script",
-      "uri": "vendor/jquery/jquery.min.js",
-      "package": "jquery",
-      "version": "3.7.1"
-    },
-    {
-      "name": "jquery-migrate",
-      "type": "script",
-      "uri": "vendor/jquery-migrate/jquery-migrate.min.js",
-      "dependencies": [
-        "jquery"
-      ],
-      "package": "jquery-migrate",
-      "version": "3.4.1"
+      "version": "5.2.1"
     },
     {
       "name": "hotkeysjs",
@@ -208,14 +191,31 @@
         "defer": true
       },
       "package": "hotkeys-js",
-      "version": "3.12.0"
+      "version": "3.13.15"
+    },
+    {
+      "name": "jquery-migrate",
+      "type": "script",
+      "uri": "vendor/jquery-migrate/jquery-migrate.min.js",
+      "dependencies": [
+        "jquery"
+      ],
+      "package": "jquery-migrate",
+      "version": "3.5.2"
+    },
+    {
+      "name": "jquery",
+      "type": "script",
+      "uri": "vendor/jquery/jquery.min.js",
+      "package": "jquery",
+      "version": "3.7.1"
     },
     {
       "name": "webcomponent.joomla-alert",
       "type": "style",
       "uri": "vendor/joomla-custom-elements/joomla-alert.min.css",
       "package": "joomla-ui-custom-elements",
-      "version": "0.2.0"
+      "version": "0.4.1"
     },
     {
       "name": "webcomponent.joomla-alert-legacy",
@@ -229,7 +229,7 @@
         "wcpolyfill"
       ],
       "package": "joomla-ui-custom-elements",
-      "version": "0.2.0"
+      "version": "0.4.1"
     },
     {
       "name": "webcomponent.joomla-alert",
@@ -242,14 +242,14 @@
         "wcpolyfill"
       ],
       "package": "joomla-ui-custom-elements",
-      "version": "0.2.0"
+      "version": "0.4.1"
     },
     {
       "name": "webcomponent.joomla-tab",
       "type": "style",
       "uri": "vendor/joomla-custom-elements/joomla-tab.min.css",
       "package": "joomla-ui-custom-elements",
-      "version": "0.2.0"
+      "version": "0.4.1"
     },
     {
       "name": "webcomponent.joomla-tab-legacy",
@@ -263,7 +263,7 @@
         "wcpolyfill"
       ],
       "package": "joomla-ui-custom-elements",
-      "version": "0.2.0"
+      "version": "0.4.1"
     },
     {
       "name": "webcomponent.joomla-tab",
@@ -276,7 +276,7 @@
         "wcpolyfill"
       ],
       "package": "joomla-ui-custom-elements",
-      "version": "0.2.0"
+      "version": "0.4.1"
     },
     {
       "name": "chosen",
@@ -356,11 +356,35 @@
       "version": "4.1.7"
     },
     {
+      "name": "sa11y",
+      "type": "script",
+      "uri": "vendor/sa11y/sa11y.esm.min.js",
+      "importmap": true,
+      "package": "sa11y",
+      "version": "4.2.3"
+    },
+    {
+      "name": "sa11y-lang",
+      "type": "script",
+      "uri": "vendor/sa11y/en.js",
+      "importmap": true,
+      "description": "A placeholder asset which is later initialised by plugin, depending on active language.",
+      "package": "sa11y",
+      "version": "4.2.3"
+    },
+    {
+      "name": "sa11y",
+      "type": "style",
+      "uri": "vendor/sa11y/sa11y.min.css",
+      "package": "sa11y",
+      "version": "4.2.3"
+    },
+    {
       "name": "qrcode",
       "type": "script",
       "uri": "vendor/qrcode/qrcode.js",
       "package": "qrcode-generator",
-      "version": "1.4.4"
+      "version": "1.5.2"
     },
     {
       "name": "qrcode_SJIS",
@@ -370,7 +394,7 @@
         "qrcode"
       ],
       "package": "qrcode-generator",
-      "version": "1.4.4"
+      "version": "1.5.2"
     },
     {
       "name": "qrcode_UTF8",
@@ -380,7 +404,7 @@
         "qrcode"
       ],
       "package": "qrcode-generator",
-      "version": "1.4.4"
+      "version": "1.5.2"
     },
     {
       "name": "qrcode",
@@ -391,21 +415,21 @@
         "qrcode_UTF8#script"
       ],
       "package": "qrcode-generator",
-      "version": "1.4.4"
+      "version": "1.5.2"
     },
     {
       "name": "fontawesome",
       "type": "style",
       "uri": "vendor/fontawesome-free/fontawesome.min.css",
       "package": "@fortawesome/fontawesome-free",
-      "version": "6.4.2"
+      "version": "6.7.2"
     },
     {
       "name": "bootstrap.css",
       "type": "style",
       "uri": "vendor/bootstrap/bootstrap.min.css",
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.css.grid",
@@ -415,7 +439,7 @@
         "bootstrap.css"
       ],
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.alert",
@@ -428,7 +452,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.button",
@@ -441,7 +465,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.carousel",
@@ -454,7 +478,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.collapse",
@@ -467,7 +491,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.dropdown",
@@ -480,7 +504,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.modal",
@@ -493,7 +517,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.offcanvas",
@@ -506,7 +530,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.popover",
@@ -519,7 +543,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.scrollspy",
@@ -532,7 +556,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.tab",
@@ -545,7 +569,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     },
     {
       "name": "bootstrap.toast",
@@ -558,7 +582,7 @@
         "type": "module"
       },
       "package": "bootstrap",
-      "version": "5.3.2"
+      "version": "5.3.8"
     }
   ]
 }

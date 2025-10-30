@@ -15,10 +15,10 @@ use Joomla\CMS\Factory;
 use Joomla\CMS\Helper\ContentHelper;
 use Joomla\CMS\Language\Associations;
 use Joomla\CMS\Language\Text;
-use Joomla\CMS\MVC\View\GenericDataException;
 use Joomla\CMS\MVC\View\HtmlView as BaseHtmlView;
 use Joomla\CMS\Toolbar\Toolbar;
 use Joomla\CMS\Toolbar\ToolbarHelper;
+use Joomla\Component\Newsfeeds\Administrator\Model\NewsfeedModel;
 
 // phpcs:disable PSR1.Files.SideEffects
 \defined('_JEXEC') or die;
@@ -59,6 +59,15 @@ class HtmlView extends BaseHtmlView
     protected $state;
 
     /**
+     * Array of fieldsets not to display
+     *
+     * @var    string[]
+     *
+     * @since  5.2.0
+     */
+    public $ignore_fieldsets = [];
+
+    /**
      * Execute and display a template script.
      *
      * @param   string  $tpl  The name of the template file to parse; automatically searches through the template paths.
@@ -69,13 +78,18 @@ class HtmlView extends BaseHtmlView
      */
     public function display($tpl = null)
     {
-        $this->state = $this->get('State');
-        $this->item  = $this->get('Item');
-        $this->form  = $this->get('Form');
+        /** @var NewsfeedModel $model */
+        $model = $this->getModel();
+        $model->setUseExceptions(true);
 
-        // Check for errors.
-        if (\count($errors = $this->get('Errors'))) {
-            throw new GenericDataException(implode("\n", $errors), 500);
+        $this->state = $model->getState();
+        $this->item  = $model->getItem();
+        $this->form  = $model->getForm();
+
+        if ($this->getLayout() === 'modalreturn') {
+            parent::display($tpl);
+
+            return;
         }
 
         // If we are forcing a language in modal (used for associations).
@@ -91,7 +105,12 @@ class HtmlView extends BaseHtmlView
             $this->form->setFieldAttribute('tags', 'language', '*,' . $forcedLanguage);
         }
 
-        $this->addToolbar();
+        if ($this->getLayout() !== 'modal') {
+            $this->addToolbar();
+        } else {
+            $this->addModalToolbar();
+        }
+
         parent::display($tpl);
     }
 
@@ -108,8 +127,8 @@ class HtmlView extends BaseHtmlView
 
         $user       = $this->getCurrentUser();
         $isNew      = ($this->item->id == 0);
-        $checkedOut = !(\is_null($this->item->checked_out) || $this->item->checked_out == $user->get('id'));
-        $toolbar    = Toolbar::getInstance();
+        $checkedOut = !(\is_null($this->item->checked_out) || $this->item->checked_out == $user->id);
+        $toolbar    = $this->getDocument()->getToolbar();
 
         // Since we don't track these assets at the item level, use the category id.
         $canDo = ContentHelper::getActions('com_newsfeeds', 'category', $this->item->catid);
@@ -147,7 +166,7 @@ class HtmlView extends BaseHtmlView
         } else {
             $toolbar->cancel('newsfeed.cancel');
 
-            if (ComponentHelper::isEnabled('com_contenthistory') && $this->state->params->get('save_history', 0) && $canDo->get('core.edit')) {
+            if (ComponentHelper::isEnabled('com_contenthistory') && $this->state->get('params')->get('save_history', 0) && $canDo->get('core.edit')) {
                 $toolbar->versions('com_newsfeeds.newsfeed', $this->item->id);
             }
         }
@@ -160,5 +179,38 @@ class HtmlView extends BaseHtmlView
 
         $toolbar->divider();
         $toolbar->help('News_Feeds:_Edit');
+    }
+
+    /**
+     * Add the modal toolbar.
+     *
+     * @return  void
+     *
+     * @since   5.1.0
+     *
+     * @throws  \Exception
+     */
+    protected function addModalToolbar()
+    {
+        $user       = $this->getCurrentUser();
+        $isNew      = ($this->item->id == 0);
+        $toolbar    = $this->getDocument()->getToolbar();
+
+        // Since we don't track these assets at the item level, use the category id.
+        $canDo = ContentHelper::getActions('com_newsfeeds', 'category', $this->item->catid);
+
+        $title = $isNew ? Text::_('COM_NEWSFEEDS_MANAGER_NEWSFEED_NEW') : Text::_('COM_NEWSFEEDS_MANAGER_NEWSFEED_EDIT');
+        ToolbarHelper::title($title, 'rss newsfeeds');
+
+        $canCreate = $isNew && (\count($user->getAuthorisedCategories('com_newsfeeds', 'core.create')) > 0);
+        $canEdit   = $canDo->get('core.edit');
+
+        // For new records, check the create permission.
+        if ($canCreate || $canEdit) {
+            $toolbar->apply('newsfeed.apply');
+            $toolbar->save('newsfeed.save');
+        }
+
+        $toolbar->cancel('newsfeed.cancel');
     }
 }

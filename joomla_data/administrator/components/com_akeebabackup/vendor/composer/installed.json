@@ -7,12 +7,12 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:akeeba/engine.git",
-                "reference": "cc32068789ade31c7c9dd0e7ca8d811a6d5fc853"
+                "reference": "57b93c30fff6aad5c14d75d2a5f17162d66bd0cd"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/akeeba/engine/zipball/cc32068789ade31c7c9dd0e7ca8d811a6d5fc853",
-                "reference": "cc32068789ade31c7c9dd0e7ca8d811a6d5fc853",
+                "url": "https://api.github.com/repos/akeeba/engine/zipball/57b93c30fff6aad5c14d75d2a5f17162d66bd0cd",
+                "reference": "57b93c30fff6aad5c14d75d2a5f17162d66bd0cd",
                 "shasum": ""
             },
             "require": {
@@ -42,7 +42,7 @@
                 "ext-ssh2": "*",
                 "ext-zip": "*"
             },
-            "time": "2025-08-20T12:26:33+00:00",
+            "time": "2025-10-06T07:21:55+00:00",
             "default-branch": true,
             "type": "library",
             "installation-source": "dist",
@@ -265,12 +265,12 @@
             "source": {
                 "type": "git",
                 "url": "git@github.com:akeeba/webpush.git",
-                "reference": "1a947df69e0c4014bda62e2fb140d385115578fc"
+                "reference": "25c2dfe97ddc9de936dc8880488ac5a77d9583f2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/akeeba/webpush/zipball/1a947df69e0c4014bda62e2fb140d385115578fc",
-                "reference": "1a947df69e0c4014bda62e2fb140d385115578fc",
+                "url": "https://api.github.com/repos/akeeba/webpush/zipball/25c2dfe97ddc9de936dc8880488ac5a77d9583f2",
+                "reference": "25c2dfe97ddc9de936dc8880488ac5a77d9583f2",
                 "shasum": ""
             },
             "require": {
@@ -281,7 +281,7 @@
             "suggest": {
                 "ext-gmp": "*"
             },
-            "time": "2025-08-17T13:47:58+00:00",
+            "time": "2025-10-06T07:04:19+00:00",
             "default-branch": true,
             "type": "library",
             "installation-source": "dist",
@@ -322,12 +322,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/composer/ca-bundle.git",
-                "reference": "719026bb30813accb68271fee7e39552a58e9f65"
+                "reference": "96a9896f1a7d418fc78c0c7b2a3757664f80e7fc"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/719026bb30813accb68271fee7e39552a58e9f65",
-                "reference": "719026bb30813accb68271fee7e39552a58e9f65",
+                "url": "https://api.github.com/repos/composer/ca-bundle/zipball/96a9896f1a7d418fc78c0c7b2a3757664f80e7fc",
+                "reference": "96a9896f1a7d418fc78c0c7b2a3757664f80e7fc",
                 "shasum": ""
             },
             "require": {
@@ -341,7 +341,7 @@
                 "psr/log": "^1.0 || ^2.0 || ^3.0",
                 "symfony/process": "^4.0 || ^5.0 || ^6.0 || ^7.0"
             },
-            "time": "2025-08-20T18:49:47+00:00",
+            "time": "2025-09-17T07:10:22+00:00",
             "default-branch": true,
             "type": "library",
             "extra": {
@@ -377,7 +377,7 @@
             "support": {
                 "irc": "irc://irc.freenode.org/composer",
                 "issues": "https://github.com/composer/ca-bundle/issues",
-                "source": "https://github.com/composer/ca-bundle/tree/1.5.8"
+                "source": "https://github.com/composer/ca-bundle/tree/main"
             },
             "funding": [
                 {

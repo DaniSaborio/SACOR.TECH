@@ -21,13 +21,10 @@
   }
   function setupNavigation(nav) {
     const settings = {
-      menuHoverClass: 'show-menu',
-      dir: 'ltr'
-    };
-    const topLevelChilds = nav.querySelectorAll(':scope > li');
+      menuHoverClass: 'show-menu'};
 
     // Set tabIndex to -1 so that top_level_childs can't receive focus until menu is open
-    topLevelChilds.forEach(topLevelEl => {
+    nav.querySelectorAll(':scope > li').forEach(topLevelEl => {
       const linkEl = topLevelEl.querySelector('a');
       if (linkEl) {
         linkEl.tabIndex = '0';
@@ -36,41 +33,43 @@
       }
       const spanEl = topLevelEl.querySelector('span');
       if (spanEl) {
-        spanEl.tabIndex = '0';
+        if (spanEl.parentNode.nodeName !== 'A') {
+          spanEl.tabIndex = '0';
+        }
         spanEl.addEventListener('mouseover', topLevelMouseOver(topLevelEl, settings));
         spanEl.addEventListener('mouseout', topLevelMouseOut(topLevelEl, settings));
       }
       topLevelEl.addEventListener('mouseover', ({
-        target
+        currentTarget
       }) => {
-        const ulChild = target.querySelector('ul');
+        const ulChild = currentTarget.querySelector('ul');
         if (ulChild) {
           ulChild.setAttribute('aria-hidden', 'false');
           ulChild.classList.add(settings.menuHoverClass);
         }
       });
       topLevelEl.addEventListener('mouseout', ({
-        target
+        currentTarget
       }) => {
-        const ulChild = target.querySelector('ul');
+        const ulChild = currentTarget.querySelector('ul');
         if (ulChild) {
           ulChild.setAttribute('aria-hidden', 'true');
           ulChild.classList.remove(settings.menuHoverClass);
         }
       });
       topLevelEl.addEventListener('focus', ({
-        target
+        currentTarget
       }) => {
-        const ulChild = target.querySelector('ul');
+        const ulChild = currentTarget.querySelector('ul');
         if (ulChild) {
           ulChild.setAttribute('aria-hidden', 'true');
           ulChild.classList.add(settings.menuHoverClass);
         }
       });
       topLevelEl.addEventListener('blur', ({
-        target
+        currentTarget
       }) => {
-        const ulChild = target.querySelector('ul');
+        const ulChild = currentTarget.querySelector('ul');
         if (ulChild) {
           ulChild.setAttribute('aria-hidden', 'false');
           ulChild.classList.remove(settings.menuHoverClass);
@@ -92,17 +91,13 @@
         switch (keyName) {
           case 'ArrowLeft':
             event.preventDefault();
-            if (settings.dir === 'rtl') {
-              nextLiEl.children[0].focus();
-            } else {
+            {
               prevLiEl.children[0].focus();
             }
             break;
           case 'ArrowRight':
             event.preventDefault();
-            if (settings.dir === 'rtl') {
-              prevLiEl.children[0].focus();
-            } else {
+            {
               nextLiEl.children[0].focus();
             }
             break;
@@ -136,9 +131,6 @@
     });
   }
   document.addEventListener('DOMContentLoaded', () => {
-    const navs = document.querySelectorAll('.nav');
-    [].forEach.call(navs, nav => {
-      setupNavigation(nav);
-    });
+    document.querySelectorAll('.nav').forEach(nav => setupNavigation(nav));
   });
 })();

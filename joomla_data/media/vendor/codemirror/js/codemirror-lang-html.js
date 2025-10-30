@@ -349,8 +349,8 @@ for (let a of eventAttributes)
     GlobalAttrs[a] = null;
 class Schema {
     constructor(extraTags, extraAttrs) {
-        this.tags = Object.assign(Object.assign({}, Tags), extraTags);
-        this.globalAttrs = Object.assign(Object.assign({}, GlobalAttrs), extraAttrs);
+        this.tags = { ...Tags, ...extraTags };
+        this.globalAttrs = { ...GlobalAttrs, ...extraAttrs };
         this.allTags = Object.keys(this.tags);
         this.globalAttrNames = Object.keys(this.globalAttrs);
     }
@@ -468,7 +468,7 @@ function htmlCompletionFor(schema, context) {
     else if (tree.name == "StartCloseTag" || tree.name == "IncompleteCloseTag") {
         return completeCloseTag(state, tree, pos, pos);
     }
-    else if (context.explicit && (tree.name == "OpenTag" || tree.name == "SelfClosingTag") || tree.name == "AttributeName") {
+    else if (tree.name == "OpenTag" || tree.name == "SelfClosingTag" || tree.name == "AttributeName") {
         return completeAttrName(state, schema, tree, tree.name == "AttributeName" ? tree.from : pos, pos);
     }
     else if (tree.name == "Is" || tree.name == "AttributeValue" || tree.name == "UnquotedAttributeValue") {
@@ -510,7 +510,9 @@ const defaultNesting = [
         attrs: attrs => attrs.type == "text/typescript-jsx",
         parser: tsxLanguage.parser },
     { tag: "script",
-        attrs: attrs => attrs.type == "importmap" || attrs.type == "speculationrules",
+        attrs(attrs) {
+            return /^(importmap|speculationrules|application\/(.+\+)?json)$/i.test(attrs.type);
+        },
         parser: jsonParser },
     { tag: "script",
         attrs(attrs) {
@@ -527,12 +529,6 @@ const defaultAttrs = /*@__PURE__*/[
     { name: "style",
         parser: /*@__PURE__*/cssLanguage.parser.configure({ top: "Styles" }) }
 ].concat(/*@__PURE__*/eventAttributes.map(name => ({ name, parser: javascriptLanguage.parser })));
-/**
-A language provider based on the [Lezer HTML
-parser](https://github.com/lezer-parser/html), extended with the
-JavaScript and CSS parsers to parse the content of `<script>` and
-`<style>` tags.
-*/
 const htmlPlain = /*@__PURE__*/LRLanguage.define({
     name: "html",
     parser: /*@__PURE__*/parser.configure({
@@ -578,7 +574,7 @@ const htmlPlain = /*@__PURE__*/LRLanguage.define({
     languageData: {
         commentTokens: { block: { open: "<!--", close: "-->" } },
         indentOnInput: /^\s*<\/\w+\W$/,
-        wordChars: "-._"
+        wordChars: "-_"
     }
 });
 /**
@@ -625,22 +621,21 @@ const autoCloseTags = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, t
     let closeTags = state.changeByRange(range => {
         var _a, _b, _c;
         let didType = state.doc.sliceString(range.from - 1, range.to) == text;
-        let { head } = range, around = syntaxTree(state).resolveInner(head - 1, -1), name;
-        if (around.name == "TagName" || around.name == "StartTag")
-            around = around.parent;
-        if (didType && text == ">" && around.name == "OpenTag") {
-            if (((_b = (_a = around.parent) === null || _a === void 0 ? void 0 : _a.lastChild) === null || _b === void 0 ? void 0 : _b.name) != "CloseTag" &&
-                (name = elementName(state.doc, around.parent, head)) &&
+        let { head } = range, after = syntaxTree(state).resolveInner(head, -1), name;
+        if (didType && text == ">" && after.name == "EndTag") {
+            let tag = after.parent;
+            if (((_b = (_a = tag.parent) === null || _a === void 0 ? void 0 : _a.lastChild) === null || _b === void 0 ? void 0 : _b.name) != "CloseTag" &&
+                (name = elementName(state.doc, tag.parent, head)) &&
                 !selfClosers.has(name)) {
                 let to = head + (state.doc.sliceString(head, head + 1) === ">" ? 1 : 0);
                 let insert = `</${name}>`;
                 return { range, changes: { from: head, to, insert } };
             }
         }
-        else if (didType && text == "/" && around.name == "IncompleteCloseTag") {
-            let base = around.parent;
-            if (around.from == head - 2 && ((_c = base.lastChild) === null || _c === void 0 ? void 0 : _c.name) != "CloseTag" &&
-                (name = elementName(state.doc, base, head)) && !selfClosers.has(name)) {
+        else if (didType && text == "/" && after.name == "IncompleteCloseTag") {
+            let tag = after.parent;
+            if (after.from == head - 2 && ((_c = tag.lastChild) === null || _c === void 0 ? void 0 : _c.name) != "CloseTag" &&
+                (name = elementName(state.doc, tag, head)) && !selfClosers.has(name)) {
                 let to = head + (state.doc.sliceString(head, head + 1) === ">" ? 1 : 0);
                 let insert = `${name}>`;
                 return {
@@ -663,4 +658,4 @@ const autoCloseTags = /*@__PURE__*/EditorView.inputHandler.of((view, from, to, t
     return true;
 });
 
-export { autoCloseTags, html, htmlCompletionSource, htmlCompletionSourceWith, htmlLanguage, htmlPlain };
+export { autoCloseTags, html, htmlCompletionSource, htmlCompletionSourceWith, htmlLanguage };

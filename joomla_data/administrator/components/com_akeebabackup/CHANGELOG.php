@@ -1,3 +1,15 @@
+Akeeba Backup 10.1.0
+================================================================================
++ "Only back up tables installed by Joomla! and its extensions" filter
++ Failed backup upload check
+~ Preliminary support for Joomla 6
+~ PHP 8.5 compatibility: setAccessible is deprecated for reflection objects
+~ PHP 8.5 compatibility: implicit nullable method parameters are deprecated
+# [HIGH] "Normalise character set" can break the restoration
+# [LOW] Dark Mode: Status row text had almost no contrast
+# [LOW] Cannot filter Manage Backups by Frozen state
+# [LOW] Moving from MariaDB to MySQL could result in SQL error.
+
 Akeeba Backup 10.0.6
 ================================================================================
 ~ Preliminary support for Joomla 6

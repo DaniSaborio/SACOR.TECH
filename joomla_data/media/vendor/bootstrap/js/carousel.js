@@ -1,4 +1,4 @@
-import { E as EventHandler, S as SelectorEngine, M as Manipulator, d as defineJQueryPlugin, B as BaseComponent, i as isVisible, t as triggerTransitionEnd, a as Swipe, g as getNextActiveElement, r as reflow, b as isRTL } from './dom.js?5.3.2';
+import { E as EventHandler, S as SelectorEngine, M as Manipulator, d as defineJQueryPlugin, B as BaseComponent, i as isVisible, t as triggerTransitionEnd, a as Swipe, g as getNextActiveElement, r as reflow, b as isRTL } from './dom.js?5.3.8';
 
 /**
  * --------------------------------------------------------------------------
@@ -6,6 +6,7 @@ import { E as EventHandler, S as SelectorEngine, M as Manipulator, d as defineJQ
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
  * --------------------------------------------------------------------------
  */
+
 
 /**
  * Constants
@@ -237,8 +238,7 @@ class Carousel extends BaseComponent {
     const elementInterval = Number.parseInt(element.getAttribute('data-bs-interval'), 10);
     this._config.interval = elementInterval || this._config.defaultInterval;
   }
-  _slide(order) {
-    let element = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : null;
+  _slide(order, element = null) {
     if (this._isSliding) {
       return;
     }
@@ -376,20 +376,11 @@ defineJQueryPlugin(Carousel);
 window.bootstrap = window.bootstrap || {};
 window.bootstrap.Carousel = Carousel;
 if (Joomla && Joomla.getOptions) {
-  // Get the elements/configurations from the PHP
+  // Get the elements configuration from PHP
   const carousels = Joomla.getOptions('bootstrap.carousel');
-  // Initialise the elements
   if (typeof carousels === 'object' && carousels !== null) {
     Object.keys(carousels).forEach(carousel => {
-      const opt = carousels[carousel];
-      const options = {
-        interval: opt.interval ? opt.interval : 5000,
-        keyboard: opt.keyboard ? opt.keyboard : true,
-        pause: opt.pause ? opt.pause : 'hover',
-        slide: opt.slide ? opt.slide : false,
-        wrap: opt.wrap ? opt.wrap : true,
-        touch: opt.touch ? opt.touch : true
-      };
+      const options = carousels[carousel];
       const elements = Array.from(document.querySelectorAll(carousel));
       if (elements.length) {
         elements.map(el => new window.bootstrap.Carousel(el, options));

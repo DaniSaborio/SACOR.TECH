@@ -1,6 +1,6 @@
-import { Annotation, Facet, EditorSelection, Text, findClusterBreak, countColumn, combineConfig, StateField, Transaction, ChangeSet, ChangeDesc, StateEffect, CharCategory } from '@codemirror/state';
+import { StateField, Facet, Annotation, Transaction, ChangeSet, ChangeDesc, EditorSelection, StateEffect, countColumn, findClusterBreak, Text, combineConfig, CharCategory } from '@codemirror/state';
 import { EditorView, Direction } from '@codemirror/view';
-import { IndentContext, getIndentation, indentString, matchBrackets, syntaxTree, getIndentUnit, indentUnit } from '@codemirror/language';
+import { getIndentUnit, IndentContext, getIndentation, indentString, syntaxTree, matchBrackets, indentUnit } from '@codemirror/language';
 import { NodeProp } from '@lezer/common';
 
 /**
@@ -58,7 +58,7 @@ block comments.
 */
 const toggleBlockCommentByLine = /*@__PURE__*/command((o, s) => changeBlockComment(o, s, selectedLineRanges(s)), 0 /* CommentOption.Toggle */);
 function getConfig(state, pos) {
-    let data = state.languageDataAt("commentTokens", pos);
+    let data = state.languageDataAt("commentTokens", pos, 1);
     return data.length ? data[0] : {};
 }
 const SearchMargin = 50;
@@ -100,6 +100,8 @@ function selectedLineRanges(state) {
     for (let r of state.selection.ranges) {
         let fromLine = state.doc.lineAt(r.from);
         let toLine = r.to <= fromLine.to ? fromLine : state.doc.lineAt(r.to);
+        if (toLine.from > fromLine.from && toLine.from == r.to)
+            toLine = r.to == fromLine.to + 1 ? fromLine : state.doc.lineAt(r.to - 1);
         let last = ranges.length - 1;
         if (last >= 0 && ranges[last].to > fromLine.from)
             ranges[last].to = toLine.to;
@@ -214,11 +216,6 @@ const historyConfig = /*@__PURE__*/Facet.define({
         });
     }
 });
-function changeEnd(changes) {
-    let end = 0;
-    changes.iterChangedRanges((_, to) => end = to);
-    return end;
-}
 const historyField_ = /*@__PURE__*/StateField.define({
     create() {
         return HistoryState.empty;
@@ -227,8 +224,7 @@ const historyField_ = /*@__PURE__*/StateField.define({
         let config = tr.state.facet(historyConfig);
         let fromHist = tr.annotation(fromHistory);
         if (fromHist) {
-            let selection = tr.docChanged ? EditorSelection.single(changeEnd(tr.changes)) : undefined;
-            let item = HistEvent.fromTransaction(tr, selection), from = fromHist.side;
+            let item = HistEvent.fromTransaction(tr, fromHist.selection), from = fromHist.side;
             let other = from == 0 /* BranchName.Done */ ? state.undone : state.done;
             if (item)
                 other = updateBranch(other, other.length, config.minDepth, item);
@@ -490,7 +486,7 @@ class HistoryState {
                 config.joinToEvent(tr, isAdjacent(lastEvent.changes, event.changes))) ||
                 // For compose (but not compose.start) events, always join with previous event
                 userEvent == "input.type.compose")) {
-            done = updateBranch(done, done.length - 1, config.minDepth, new HistEvent(event.changes.compose(lastEvent.changes), conc(event.effects, lastEvent.effects), lastEvent.mapped, lastEvent.startSelection, none));
+            done = updateBranch(done, done.length - 1, config.minDepth, new HistEvent(event.changes.compose(lastEvent.changes), conc(StateEffect.mapEffects(event.effects, lastEvent.changes), lastEvent.effects), lastEvent.mapped, lastEvent.startSelection, none));
         }
         else {
             done = updateBranch(done, done.length, config.minDepth, event);
@@ -509,15 +505,15 @@ class HistoryState {
     addMapping(mapping) {
         return new HistoryState(addMappingToBranch(this.done, mapping), addMappingToBranch(this.undone, mapping), this.prevTime, this.prevUserEvent);
     }
-    pop(side, state, selection) {
+    pop(side, state, onlySelection) {
         let branch = side == 0 /* BranchName.Done */ ? this.done : this.undone;
         if (branch.length == 0)
             return null;
-        let event = branch[branch.length - 1];
-        if (selection && event.selectionsAfter.length) {
+        let event = branch[branch.length - 1], selection = event.selectionsAfter[0] || state.selection;
+        if (onlySelection && event.selectionsAfter.length) {
             return state.update({
                 selection: event.selectionsAfter[event.selectionsAfter.length - 1],
-                annotations: fromHistory.of({ side, rest: popSelection(branch) }),
+                annotations: fromHistory.of({ side, rest: popSelection(branch), selection }),
                 userEvent: side == 0 /* BranchName.Done */ ? "select.undo" : "select.redo",
                 scrollIntoView: true
             });
@@ -533,7 +529,7 @@ class HistoryState {
                 changes: event.changes,
                 selection: event.startSelection,
                 effects: event.effects,
-                annotations: fromHistory.of({ side, rest }),
+                annotations: fromHistory.of({ side, rest, selection }),
                 filter: false,
                 userEvent: side == 0 /* BranchName.Done */ ? "undo" : "redo",
                 scrollIntoView: true
@@ -566,7 +562,7 @@ function setSel(state, selection) {
 }
 function moveSel({ state, dispatch }, how) {
     let selection = updateSel(state.selection, how);
-    if (selection.eq(state.selection))
+    if (selection.eq(state.selection, true))
         return false;
     dispatch(setSel(state, selection));
     return true;
@@ -597,6 +593,27 @@ const cursorCharForward = view => cursorByChar(view, true);
 Move the selection one character backward.
 */
 const cursorCharBackward = view => cursorByChar(view, false);
+function byCharLogical(state, range, forward) {
+    let pos = range.head, line = state.doc.lineAt(pos);
+    if (pos == (forward ? line.to : line.from))
+        pos = forward ? Math.min(state.doc.length, line.to + 1) : Math.max(0, line.from - 1);
+    else
+        pos = line.from + findClusterBreak(line.text, pos - line.from, forward);
+    return EditorSelection.cursor(pos, forward ? -1 : 1);
+}
+function moveByCharLogical(target, forward) {
+    return moveSel(target, range => range.empty ? byCharLogical(target.state, range, forward) : rangeEnd(range, forward));
+}
+/**
+Move the selection one character forward, in logical
+(non-text-direction-aware) string index order.
+*/
+const cursorCharForwardLogical = target => moveByCharLogical(target, true);
+/**
+Move the selection one character backward, in logical string index
+order.
+*/
+const cursorCharBackwardLogical = target => moveByCharLogical(target, false);
 function cursorByGroup(view, forward) {
     return moveSel(view, range => range.empty ? view.moveByGroup(range, forward) : rangeEnd(range, forward));
 }
@@ -617,6 +634,26 @@ const cursorGroupForward = view => cursorByGroup(view, true);
 Move the selection one group backward.
 */
 const cursorGroupBackward = view => cursorByGroup(view, false);
+function toGroupStart(view, pos, start) {
+    let categorize = view.state.charCategorizer(pos);
+    let cat = categorize(start), initial = cat != CharCategory.Space;
+    return (next) => {
+        let nextCat = categorize(next);
+        if (nextCat != CharCategory.Space)
+            return initial && nextCat == cat;
+        initial = false;
+        return true;
+    };
+}
+/**
+Move the cursor one group forward in the default Windows style,
+where it moves to the start of the next group.
+*/
+const cursorGroupForwardWin = view => {
+    return moveSel(view, range => range.empty
+        ? view.moveByChar(range, true, start => toGroupStart(view, range.head, start))
+        : rangeEnd(range, true));
+};
 const segmenter = typeof Intl != "undefined" && Intl.Segmenter ?
     /*@__PURE__*/new (Intl.Segmenter)(undefined, { granularity: "word" }) : null;
 function moveBySubword(view, range, forward) {
@@ -847,14 +884,14 @@ Extend the selection to the bracket matching the one the selection
 head is currently on, if any.
 */
 const selectMatchingBracket = ({ state, dispatch }) => toMatchingBracket(state, dispatch, true);
-function extendSel(view, how) {
-    let selection = updateSel(view.state.selection, range => {
+function extendSel(target, how) {
+    let selection = updateSel(target.state.selection, range => {
         let head = how(range);
         return EditorSelection.range(range.anchor, head.head, head.goalColumn, head.bidiLevel || undefined);
     });
-    if (selection.eq(view.state.selection))
+    if (selection.eq(target.state.selection))
         return false;
-    view.dispatch(setSel(view.state, selection));
+    target.dispatch(setSel(target.state, selection));
     return true;
 }
 function selectByChar(view, forward) {
@@ -877,6 +914,16 @@ const selectCharForward = view => selectByChar(view, true);
 Move the selection head one character backward.
 */
 const selectCharBackward = view => selectByChar(view, false);
+/**
+Move the selection head one character forward by logical
+(non-direction aware) string index order.
+*/
+const selectCharForwardLogical = target => extendSel(target, range => byCharLogical(target.state, range, true));
+/**
+Move the selection head one character backward by logical string
+index order.
+*/
+const selectCharBackwardLogical = target => extendSel(target, range => byCharLogical(target.state, range, false));
 function selectByGroup(view, forward) {
     return extendSel(view, range => view.moveByGroup(range, forward));
 }
@@ -897,6 +944,13 @@ const selectGroupForward = view => selectByGroup(view, true);
 Move the selection head one group backward.
 */
 const selectGroupBackward = view => selectByGroup(view, false);
+/**
+Move the selection head one group forward in the default Windows
+style, skipping to the start of the next group.
+*/
+const selectGroupForwardWin = view => {
+    return extendSel(view, range => view.moveByChar(range, true, start => toGroupStart(view, range.head, start)));
+};
 function selectBySubword(view, forward) {
     return extendSel(view, range => moveBySubword(view, range, forward));
 }
@@ -1013,14 +1067,23 @@ syntax tree.
 */
 const selectParentSyntax = ({ state, dispatch }) => {
     let selection = updateSel(state.selection, range => {
-        var _a;
-        let context = syntaxTree(state).resolveInner(range.head, 1);
-        while (!((context.from < range.from && context.to >= range.to) ||
-            (context.to > range.to && context.from <= range.from) ||
-            !((_a = context.parent) === null || _a === void 0 ? void 0 : _a.parent)))
-            context = context.parent;
-        return EditorSelection.range(context.to, context.from);
+        let tree = syntaxTree(state), stack = tree.resolveStack(range.from, 1);
+        if (range.empty) {
+            let stackBefore = tree.resolveStack(range.from, -1);
+            if (stackBefore.node.from >= stack.node.from && stackBefore.node.to <= stack.node.to)
+                stack = stackBefore;
+        }
+        for (let cur = stack; cur; cur = cur.next) {
+            let { node } = cur;
+            if (((node.from < range.from && node.to >= range.to) ||
+                (node.to > range.to && node.from <= range.from)) &&
+                cur.next)
+                return EditorSelection.range(node.to, node.from);
+        }
+        return range;
     });
+    if (selection.eq(state.selection))
+        return false;
     dispatch(setSel(state, selection));
     return true;
 };
@@ -1047,7 +1110,7 @@ function deleteBy(target, by) {
     let changes = state.changeByRange(range => {
         let { from, to } = range;
         if (from == to) {
-            let towards = by(from);
+            let towards = by(range);
             if (towards < from) {
                 event = "delete.backward";
                 towards = skipAtomic(target, towards, false);
@@ -1063,7 +1126,7 @@ function deleteBy(target, by) {
             from = skipAtomic(target, from, false);
             to = skipAtomic(target, to, true);
         }
-        return from == to ? { range } : { changes: { from, to }, range: EditorSelection.cursor(from) };
+        return from == to ? { range } : { changes: { from, to }, range: EditorSelection.cursor(from, from < range.head ? -1 : 1) };
     });
     if (changes.changes.empty)
         return false;
@@ -1083,9 +1146,9 @@ function skipAtomic(target, pos, forward) {
             });
     return pos;
 }
-const deleteByChar = (target, forward) => deleteBy(target, pos => {
-    let { state } = target, line = state.doc.lineAt(pos), before, targetPos;
-    if (!forward && pos > line.from && pos < line.from + 200 &&
+const deleteByChar = (target, forward, byIndentUnit) => deleteBy(target, range => {
+    let pos = range.from, { state } = target, line = state.doc.lineAt(pos), before, targetPos;
+    if (byIndentUnit && !forward && pos > line.from && pos < line.from + 200 &&
         !/[^ \t]/.test(before = line.text.slice(0, pos - line.from))) {
         if (before[before.length - 1] == "\t")
             return pos - 1;
@@ -1098,24 +1161,32 @@ const deleteByChar = (target, forward) => deleteBy(target, pos => {
         targetPos = findClusterBreak(line.text, pos - line.from, forward, forward) + line.from;
         if (targetPos == pos && line.number != (forward ? state.doc.lines : 1))
             targetPos += forward ? 1 : -1;
+        else if (!forward && /[\ufe00-\ufe0f]/.test(line.text.slice(targetPos - line.from, pos - line.from)))
+            targetPos = findClusterBreak(line.text, targetPos - line.from, false, false) + line.from;
     }
     return targetPos;
 });
 /**
-Delete the selection, or, for cursor selections, the character
-before the cursor.
+Delete the selection, or, for cursor selections, the character or
+indentation unit before the cursor.
 */
-const deleteCharBackward = view => deleteByChar(view, false);
+const deleteCharBackward = view => deleteByChar(view, false, true);
+/**
+Delete the selection or the character before the cursor. Does not
+implement any extended behavior like deleting whole indentation
+units in one go.
+*/
+const deleteCharBackwardStrict = view => deleteByChar(view, false, false);
 /**
 Delete the selection or the character after the cursor.
 */
-const deleteCharForward = view => deleteByChar(view, true);
-const deleteByGroup = (target, forward) => deleteBy(target, start => {
-    let pos = start, { state } = target, line = state.doc.lineAt(pos);
+const deleteCharForward = view => deleteByChar(view, true, false);
+const deleteByGroup = (target, forward) => deleteBy(target, range => {
+    let pos = range.head, { state } = target, line = state.doc.lineAt(pos);
     let categorize = state.charCategorizer(pos);
     for (let cat = null;;) {
         if (pos == (forward ? line.to : line.from)) {
-            if (pos == start && line.number != (forward ? state.doc.lines : 1))
+            if (pos == range.head && line.number != (forward ? state.doc.lines : 1))
                 pos += forward ? 1 : -1;
             break;
         }
@@ -1124,7 +1195,7 @@ const deleteByGroup = (target, forward) => deleteBy(target, start => {
         let nextCat = categorize(nextChar);
         if (cat != null && nextCat != cat)
             break;
-        if (nextChar != " " || pos != start)
+        if (nextChar != " " || pos != range.head)
             cat = nextCat;
         pos = next;
     }
@@ -1145,18 +1216,34 @@ Delete the selection, or, if it is a cursor selection, delete to
 the end of the line. If the cursor is directly at the end of the
 line, delete the line break after it.
 */
-const deleteToLineEnd = view => deleteBy(view, pos => {
-    let lineEnd = view.lineBlockAt(pos).to;
-    return pos < lineEnd ? lineEnd : Math.min(view.state.doc.length, pos + 1);
+const deleteToLineEnd = view => deleteBy(view, range => {
+    let lineEnd = view.lineBlockAt(range.head).to;
+    return range.head < lineEnd ? lineEnd : Math.min(view.state.doc.length, range.head + 1);
 });
 /**
 Delete the selection, or, if it is a cursor selection, delete to
 the start of the line. If the cursor is directly at the start of the
 line, delete the line break before it.
 */
-const deleteToLineStart = view => deleteBy(view, pos => {
-    let lineStart = view.lineBlockAt(pos).from;
-    return pos > lineStart ? lineStart : Math.max(0, pos - 1);
+const deleteToLineStart = view => deleteBy(view, range => {
+    let lineStart = view.lineBlockAt(range.head).from;
+    return range.head > lineStart ? lineStart : Math.max(0, range.head - 1);
+});
+/**
+Delete the selection, or, if it is a cursor selection, delete to
+the start of the line or the next line wrap before the cursor.
+*/
+const deleteLineBoundaryBackward = view => deleteBy(view, range => {
+    let lineStart = view.moveToLineBoundary(range, false).head;
+    return range.head > lineStart ? lineStart : Math.max(0, range.head - 1);
+});
+/**
+Delete the selection, or, if it is a cursor selection, delete to
+the end of the line or the next line wrap after the cursor.
+*/
+const deleteLineBoundaryForward = view => deleteBy(view, range => {
+    let lineStart = view.moveToLineBoundary(range, true).head;
+    return range.head < lineStart ? lineStart : Math.min(view.state.doc.length, range.head + 1);
 });
 /**
 Delete all whitespace directly before a line end from the
@@ -1310,7 +1397,15 @@ const deleteLine = view => {
             to++;
         return { from, to };
     }));
-    let selection = updateSel(state.selection, range => view.moveVertically(range, true)).map(changes);
+    let selection = updateSel(state.selection, range => {
+        let dist = undefined;
+        if (view.lineWrapping) {
+            let block = view.lineBlockAt(range.head), pos = view.coordsAtPos(range.head, range.assoc || 1);
+            if (pos)
+                dist = (block.bottom + view.documentTop) - pos.bottom + view.defaultLineHeight / 2;
+        }
+        return view.moveVertically(range, true, dist);
+    }).map(changes);
     view.dispatch({ changes, selection, scrollIntoView: true, userEvent: "delete.line" });
     return true;
 };
@@ -1319,6 +1414,20 @@ Replace the selection with a newline.
 */
 const insertNewline = ({ state, dispatch }) => {
     dispatch(state.update(state.replaceSelection(state.lineBreak), { scrollIntoView: true, userEvent: "input" }));
+    return true;
+};
+/**
+Replace the selection with a newline and the same amount of
+indentation as the line above.
+*/
+const insertNewlineKeepIndent = ({ state, dispatch }) => {
+    dispatch(state.update(state.changeByRange(range => {
+        let indent = /^\s*/.exec(state.doc.lineAt(range.from).text)[0];
+        return {
+            changes: { from: range.from, to: range.to, insert: state.lineBreak + indent },
+            range: EditorSelection.cursor(range.from + indent.length + 1)
+        };
+    }), { scrollIntoView: true, userEvent: "input" }));
     return true;
 };
 function isBetweenBrackets(state, pos) {
@@ -1453,6 +1562,26 @@ const indentLess = ({ state, dispatch }) => {
     return true;
 };
 /**
+Enables or disables
+[tab-focus mode](https://codemirror.net/6/docs/ref/#view.EditorView.setTabFocusMode). While on, this
+prevents the editor's key bindings from capturing Tab or
+Shift-Tab, making it possible for the user to move focus out of
+the editor with the keyboard.
+*/
+const toggleTabFocusMode = view => {
+    view.setTabFocusMode();
+    return true;
+};
+/**
+Temporarily enables [tab-focus
+mode](https://codemirror.net/6/docs/ref/#view.EditorView.setTabFocusMode) for two seconds or until
+another key is pressed.
+*/
+const temporarilySetTabFocusMode = view => {
+    view.setTabFocusMode(2000);
+    return true;
+};
+/**
 Insert a tab character at the cursor or, if something is selected,
 use [`indentMore`](https://codemirror.net/6/docs/ref/#commands.indentMore) to indent the entire
 selection.
@@ -1521,14 +1650,14 @@ property changed to `mac`.)
  - End: [`cursorLineBoundaryForward`](https://codemirror.net/6/docs/ref/#commands.cursorLineBoundaryForward) ([`selectLineBoundaryForward`](https://codemirror.net/6/docs/ref/#commands.selectLineBoundaryForward) with Shift)
  - Ctrl-Home (Cmd-Home on macOS): [`cursorDocStart`](https://codemirror.net/6/docs/ref/#commands.cursorDocStart) ([`selectDocStart`](https://codemirror.net/6/docs/ref/#commands.selectDocStart) with Shift)
  - Ctrl-End (Cmd-Home on macOS): [`cursorDocEnd`](https://codemirror.net/6/docs/ref/#commands.cursorDocEnd) ([`selectDocEnd`](https://codemirror.net/6/docs/ref/#commands.selectDocEnd) with Shift)
- - Enter: [`insertNewlineAndIndent`](https://codemirror.net/6/docs/ref/#commands.insertNewlineAndIndent)
+ - Enter and Shift-Enter: [`insertNewlineAndIndent`](https://codemirror.net/6/docs/ref/#commands.insertNewlineAndIndent)
  - Ctrl-a (Cmd-a on macOS): [`selectAll`](https://codemirror.net/6/docs/ref/#commands.selectAll)
  - Backspace: [`deleteCharBackward`](https://codemirror.net/6/docs/ref/#commands.deleteCharBackward)
  - Delete: [`deleteCharForward`](https://codemirror.net/6/docs/ref/#commands.deleteCharForward)
  - Ctrl-Backspace (Alt-Backspace on macOS): [`deleteGroupBackward`](https://codemirror.net/6/docs/ref/#commands.deleteGroupBackward)
  - Ctrl-Delete (Alt-Delete on macOS): [`deleteGroupForward`](https://codemirror.net/6/docs/ref/#commands.deleteGroupForward)
- - Cmd-Backspace (macOS): [`deleteToLineStart`](https://codemirror.net/6/docs/ref/#commands.deleteToLineStart).
- - Cmd-Delete (macOS): [`deleteToLineEnd`](https://codemirror.net/6/docs/ref/#commands.deleteToLineEnd).
+ - Cmd-Backspace (macOS): [`deleteLineBoundaryBackward`](https://codemirror.net/6/docs/ref/#commands.deleteLineBoundaryBackward).
+ - Cmd-Delete (macOS): [`deleteLineBoundaryForward`](https://codemirror.net/6/docs/ref/#commands.deleteLineBoundaryForward).
 */
 const standardKeymap = /*@__PURE__*/[
     { key: "ArrowLeft", run: cursorCharLeft, shift: selectCharLeft, preventDefault: true },
@@ -1549,14 +1678,14 @@ const standardKeymap = /*@__PURE__*/[
     { key: "Mod-Home", run: cursorDocStart, shift: selectDocStart },
     { key: "End", run: cursorLineBoundaryForward, shift: selectLineBoundaryForward, preventDefault: true },
     { key: "Mod-End", run: cursorDocEnd, shift: selectDocEnd },
-    { key: "Enter", run: insertNewlineAndIndent },
+    { key: "Enter", run: insertNewlineAndIndent, shift: insertNewlineAndIndent },
     { key: "Mod-a", run: selectAll },
     { key: "Backspace", run: deleteCharBackward, shift: deleteCharBackward },
     { key: "Delete", run: deleteCharForward },
     { key: "Mod-Backspace", mac: "Alt-Backspace", run: deleteGroupBackward },
     { key: "Mod-Delete", mac: "Alt-Delete", run: deleteGroupForward },
-    { mac: "Mod-Backspace", run: deleteToLineStart },
-    { mac: "Mod-Delete", run: deleteToLineEnd }
+    { mac: "Mod-Backspace", run: deleteLineBoundaryBackward },
+    { mac: "Mod-Delete", run: deleteLineBoundaryForward }
 ].concat(/*@__PURE__*/emacsStyleKeymap.map(b => ({ mac: b.key, run: b.run, shift: b.shift })));
 /**
 The default keymap. Includes all bindings from
@@ -1579,6 +1708,7 @@ The default keymap. Includes all bindings from
 - Shift-Ctrl-\\ (Shift-Cmd-\\ on macOS): [`cursorMatchingBracket`](https://codemirror.net/6/docs/ref/#commands.cursorMatchingBracket)
 - Ctrl-/ (Cmd-/ on macOS): [`toggleComment`](https://codemirror.net/6/docs/ref/#commands.toggleComment).
 - Shift-Alt-a: [`toggleBlockComment`](https://codemirror.net/6/docs/ref/#commands.toggleBlockComment).
+- Ctrl-m (Alt-Shift-m on macOS): [`toggleTabFocusMode`](https://codemirror.net/6/docs/ref/#commands.toggleTabFocusMode).
 */
 const defaultKeymap = /*@__PURE__*/[
     { key: "Alt-ArrowLeft", mac: "Ctrl-ArrowLeft", run: cursorSyntaxLeft, shift: selectSyntaxLeft },
@@ -1597,7 +1727,8 @@ const defaultKeymap = /*@__PURE__*/[
     { key: "Shift-Mod-k", run: deleteLine },
     { key: "Shift-Mod-\\", run: cursorMatchingBracket },
     { key: "Mod-/", run: toggleComment },
-    { key: "Alt-A", run: toggleBlockComment }
+    { key: "Alt-A", run: toggleBlockComment },
+    { key: "Ctrl-m", mac: "Shift-Alt-m", run: toggleTabFocusMode },
 ].concat(standardKeymap);
 /**
 A binding that binds Tab to [`indentMore`](https://codemirror.net/6/docs/ref/#commands.indentMore) and
@@ -1607,4 +1738,4 @@ this.
 */
 const indentWithTab = { key: "Tab", run: indentMore, shift: indentLess };
 
-export { blockComment, blockUncomment, copyLineDown, copyLineUp, cursorCharBackward, cursorCharForward, cursorCharLeft, cursorCharRight, cursorDocEnd, cursorDocStart, cursorGroupBackward, cursorGroupForward, cursorGroupLeft, cursorGroupRight, cursorLineBoundaryBackward, cursorLineBoundaryForward, cursorLineBoundaryLeft, cursorLineBoundaryRight, cursorLineDown, cursorLineEnd, cursorLineStart, cursorLineUp, cursorMatchingBracket, cursorPageDown, cursorPageUp, cursorSubwordBackward, cursorSubwordForward, cursorSyntaxLeft, cursorSyntaxRight, defaultKeymap, deleteCharBackward, deleteCharForward, deleteGroupBackward, deleteGroupForward, deleteLine, deleteToLineEnd, deleteToLineStart, deleteTrailingWhitespace, emacsStyleKeymap, history, historyField, historyKeymap, indentLess, indentMore, indentSelection, indentWithTab, insertBlankLine, insertNewline, insertNewlineAndIndent, insertTab, invertedEffects, isolateHistory, lineComment, lineUncomment, moveLineDown, moveLineUp, redo, redoDepth, redoSelection, selectAll, selectCharBackward, selectCharForward, selectCharLeft, selectCharRight, selectDocEnd, selectDocStart, selectGroupBackward, selectGroupForward, selectGroupLeft, selectGroupRight, selectLine, selectLineBoundaryBackward, selectLineBoundaryForward, selectLineBoundaryLeft, selectLineBoundaryRight, selectLineDown, selectLineEnd, selectLineStart, selectLineUp, selectMatchingBracket, selectPageDown, selectPageUp, selectParentSyntax, selectSubwordBackward, selectSubwordForward, selectSyntaxLeft, selectSyntaxRight, simplifySelection, splitLine, standardKeymap, toggleBlockComment, toggleBlockCommentByLine, toggleComment, toggleLineComment, transposeChars, undo, undoDepth, undoSelection };
+export { blockComment, blockUncomment, copyLineDown, copyLineUp, cursorCharBackward, cursorCharBackwardLogical, cursorCharForward, cursorCharForwardLogical, cursorCharLeft, cursorCharRight, cursorDocEnd, cursorDocStart, cursorGroupBackward, cursorGroupForward, cursorGroupForwardWin, cursorGroupLeft, cursorGroupRight, cursorLineBoundaryBackward, cursorLineBoundaryForward, cursorLineBoundaryLeft, cursorLineBoundaryRight, cursorLineDown, cursorLineEnd, cursorLineStart, cursorLineUp, cursorMatchingBracket, cursorPageDown, cursorPageUp, cursorSubwordBackward, cursorSubwordForward, cursorSyntaxLeft, cursorSyntaxRight, defaultKeymap, deleteCharBackward, deleteCharBackwardStrict, deleteCharForward, deleteGroupBackward, deleteGroupForward, deleteLine, deleteLineBoundaryBackward, deleteLineBoundaryForward, deleteToLineEnd, deleteToLineStart, deleteTrailingWhitespace, emacsStyleKeymap, history, historyField, historyKeymap, indentLess, indentMore, indentSelection, indentWithTab, insertBlankLine, insertNewline, insertNewlineAndIndent, insertNewlineKeepIndent, insertTab, invertedEffects, isolateHistory, lineComment, lineUncomment, moveLineDown, moveLineUp, redo, redoDepth, redoSelection, selectAll, selectCharBackward, selectCharBackwardLogical, selectCharForward, selectCharForwardLogical, selectCharLeft, selectCharRight, selectDocEnd, selectDocStart, selectGroupBackward, selectGroupForward, selectGroupForwardWin, selectGroupLeft, selectGroupRight, selectLine, selectLineBoundaryBackward, selectLineBoundaryForward, selectLineBoundaryLeft, selectLineBoundaryRight, selectLineDown, selectLineEnd, selectLineStart, selectLineUp, selectMatchingBracket, selectPageDown, selectPageUp, selectParentSyntax, selectSubwordBackward, selectSubwordForward, selectSyntaxLeft, selectSyntaxRight, simplifySelection, splitLine, standardKeymap, temporarilySetTabFocusMode, toggleBlockComment, toggleBlockCommentByLine, toggleComment, toggleLineComment, toggleTabFocusMode, transposeChars, undo, undoDepth, undoSelection };

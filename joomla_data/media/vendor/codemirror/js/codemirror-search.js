@@ -1,5 +1,5 @@
-import { getPanel, EditorView, showPanel, ViewPlugin, Decoration, runScopeHandlers } from '@codemirror/view';
-import { codePointAt, fromCodePoint, codePointSize, StateEffect, EditorSelection, EditorState, CharCategory, findClusterBreak, Prec, StateField, Facet, combineConfig, RangeSetBuilder } from '@codemirror/state';
+import { getPanel, EditorView, ViewPlugin, showPanel, Decoration, runScopeHandlers } from '@codemirror/view';
+import { StateEffect, codePointAt, fromCodePoint, codePointSize, EditorState, StateField, EditorSelection, Facet, Prec, combineConfig, CharCategory, RangeSetBuilder, findClusterBreak } from '@codemirror/state';
 
 function crelt() {
   var elt = arguments[0];
@@ -106,28 +106,29 @@ class SearchCursor {
             let str = fromCodePoint(next), start = this.bufferStart + this.bufferPos;
             this.bufferPos += codePointSize(next);
             let norm = this.normalize(str);
-            for (let i = 0, pos = start;; i++) {
-                let code = norm.charCodeAt(i);
-                let match = this.match(code, pos);
-                if (i == norm.length - 1) {
-                    if (match) {
-                        this.value = match;
-                        return this;
+            if (norm.length)
+                for (let i = 0, pos = start;; i++) {
+                    let code = norm.charCodeAt(i);
+                    let match = this.match(code, pos, this.bufferPos + this.bufferStart);
+                    if (i == norm.length - 1) {
+                        if (match) {
+                            this.value = match;
+                            return this;
+                        }
+                        break;
                     }
-                    break;
+                    if (pos == start && i < str.length && str.charCodeAt(i) == code)
+                        pos++;
                 }
-                if (pos == start && i < str.length && str.charCodeAt(i) == code)
-                    pos++;
-            }
         }
     }
-    match(code, pos) {
+    match(code, pos, end) {
         let match = null;
         for (let i = 0; i < this.matches.length; i += 2) {
             let index = this.matches[i], keep = false;
             if (this.query.charCodeAt(index) == code) {
                 if (index == this.query.length - 1) {
-                    match = { from: this.matches[i + 1], to: pos + 1 };
+                    match = { from: this.matches[i + 1], to: end };
                 }
                 else {
                     this.matches[i]++;
@@ -141,11 +142,11 @@ class SearchCursor {
         }
         if (this.query.charCodeAt(0) == code) {
             if (this.query.length == 1)
-                match = { from: pos, to: pos + 1 };
+                match = { from: pos, to: end };
             else
                 this.matches.push(1, pos);
         }
-        if (match && this.test && !this.test(match.from, match.to, this.buffer, this.bufferPos))
+        if (match && this.test && !this.test(match.from, match.to, this.buffer, this.bufferStart))
             match = null;
         return match;
     }
@@ -333,7 +334,8 @@ function toCharEnd(text, pos) {
 }
 
 function createLineDialog(view) {
-    let input = crelt("input", { class: "cm-textfield", name: "line" });
+    let line = String(view.state.doc.lineAt(view.state.selection.main.head).number);
+    let input = crelt("input", { class: "cm-textfield", name: "line", value: line });
     let dom = crelt("form", {
         class: "cm-gotoLine",
         onkeydown: (event) => {
@@ -351,7 +353,15 @@ function createLineDialog(view) {
             event.preventDefault();
             go();
         }
-    }, crelt("label", view.state.phrase("Go to line"), ": ", input), " ", crelt("button", { class: "cm-button", type: "submit" }, view.state.phrase("go")));
+    }, crelt("label", view.state.phrase("Go to line"), ": ", input), " ", crelt("button", { class: "cm-button", type: "submit" }, view.state.phrase("go")), crelt("button", {
+        name: "close",
+        onclick: () => {
+            view.dispatch({ effects: dialogEffect.of(false) });
+            view.focus();
+        },
+        "aria-label": view.state.phrase("close"),
+        type: "button"
+    }, ["×"]));
     function go() {
         let match = /^([+-])?(\d+)?(:\d+)?(%)?$/.exec(input.value);
         if (!match)
@@ -409,13 +419,23 @@ const gotoLine = view => {
         panel = getPanel(view, createLineDialog);
     }
     if (panel)
-        panel.dom.querySelector("input").focus();
+        panel.dom.querySelector("input").select();
     return true;
 };
 const baseTheme$1 = /*@__PURE__*/EditorView.baseTheme({
     ".cm-panel.cm-gotoLine": {
         padding: "2px 6px 4px",
-        "& label": { fontSize: "80%" }
+        position: "relative",
+        "& label": { fontSize: "80%" },
+        "& [name=close]": {
+            position: "absolute",
+            top: "0", bottom: "0",
+            right: "4px",
+            backgroundColor: "inherit",
+            border: "none",
+            font: "inherit",
+            padding: "0"
+        }
     }
 });
 
@@ -488,12 +508,12 @@ const matchHighlighter = /*@__PURE__*/ViewPlugin.fromClass(class {
             if (conf.wholeWords) {
                 query = state.sliceDoc(range.from, range.to); // TODO: allow and include leading/trailing space?
                 check = state.charCategorizer(range.head);
-                if (!(insideWordBoundaries(check, state, range.from, range.to)
-                    && insideWord(check, state, range.from, range.to)))
+                if (!(insideWordBoundaries(check, state, range.from, range.to) &&
+                    insideWord(check, state, range.from, range.to)))
                     return Decoration.none;
             }
             else {
-                query = state.sliceDoc(range.from, range.to).trim();
+                query = state.sliceDoc(range.from, range.to);
                 if (!query)
                     return Decoration.none;
             }
@@ -674,9 +694,11 @@ class StringQuery extends QueryType {
     }
     nextMatch(state, curFrom, curTo) {
         let cursor = stringCursor(this.spec, state, curTo, state.doc.length).nextOverlapping();
-        if (cursor.done)
-            cursor = stringCursor(this.spec, state, 0, curFrom).nextOverlapping();
-        return cursor.done ? null : cursor.value;
+        if (cursor.done) {
+            let end = Math.min(state.doc.length, curFrom + this.spec.unquoted.length);
+            cursor = stringCursor(this.spec, state, 0, end).nextOverlapping();
+        }
+        return cursor.done || cursor.value.from == curFrom && cursor.value.to == curTo ? null : cursor.value;
     }
     // Searching in reverse is, rather than implementing an inverted search
     // cursor, done by scanning chunk after chunk forward.
@@ -694,8 +716,10 @@ class StringQuery extends QueryType {
         }
     }
     prevMatch(state, curFrom, curTo) {
-        return this.prevMatchInRange(state, 0, curFrom) ||
-            this.prevMatchInRange(state, curTo, state.doc.length);
+        let found = this.prevMatchInRange(state, 0, curFrom);
+        if (!found)
+            found = this.prevMatchInRange(state, Math.max(0, curTo - this.spec.unquoted.length), state.doc.length);
+        return found && (found.from != curFrom || found.to != curTo) ? found : null;
     }
     getReplacement(_result) { return this.spec.unquote(this.spec.replace); }
     matchAll(state, limit) {
@@ -756,10 +780,18 @@ class RegExpQuery extends QueryType {
             this.prevMatchInRange(state, curTo, state.doc.length);
     }
     getReplacement(result) {
-        return this.spec.unquote(this.spec.replace.replace(/\$([$&\d+])/g, (m, i) => i == "$" ? "$"
-            : i == "&" ? result.match[0]
-                : i != "0" && +i < result.match.length ? result.match[i]
-                    : m));
+        return this.spec.unquote(this.spec.replace).replace(/\$([$&]|\d+)/g, (m, i) => {
+            if (i == "&")
+                return result.match[0];
+            if (i == "$")
+                return "$";
+            for (let l = i.length; l > 0; l--) {
+                let n = +i.slice(0, l);
+                if (n > 0 && n < result.match.length)
+                    return result.match[n] + i.slice(l);
+            }
+            return m;
+        });
     }
     matchAll(state, limit) {
         let cursor = regexpCursor(this.spec, state, 0, state.doc.length), ranges = [];
@@ -939,9 +971,10 @@ const replaceNext = /*@__PURE__*/searchCommand((view, { query }) => {
     let { state } = view, { from, to } = state.selection.main;
     if (state.readOnly)
         return false;
-    let next = query.nextMatch(state, from, from);
-    if (!next)
+    let match = query.nextMatch(state, from, from);
+    if (!match)
         return false;
+    let next = match;
     let changes = [], selection, replacement;
     let effects = [];
     if (next.from == from && next.to == to) {
@@ -950,14 +983,16 @@ const replaceNext = /*@__PURE__*/searchCommand((view, { query }) => {
         next = query.nextMatch(state, next.from, next.to);
         effects.push(EditorView.announce.of(state.phrase("replaced match on line $", state.doc.lineAt(from).number) + "."));
     }
+    let changeSet = view.state.changes(changes);
     if (next) {
-        let off = changes.length == 0 || changes[0].from >= next.to ? 0 : next.to - next.from - replacement.length;
-        selection = EditorSelection.single(next.from - off, next.to - off);
+        selection = EditorSelection.single(next.from, next.to).map(changeSet);
         effects.push(announceMatch(view, next));
         effects.push(state.facet(searchConfigFacet).scrollToMatch(selection.main, view));
     }
     view.dispatch({
-        changes, selection, effects,
+        changes: changeSet,
+        selection,
+        effects,
         userEvent: "input.replace"
     });
     return true;
@@ -1052,7 +1087,7 @@ Default search-related key bindings.
  - Mod-f: [`openSearchPanel`](https://codemirror.net/6/docs/ref/#search.openSearchPanel)
  - F3, Mod-g: [`findNext`](https://codemirror.net/6/docs/ref/#search.findNext)
  - Shift-F3, Shift-Mod-g: [`findPrevious`](https://codemirror.net/6/docs/ref/#search.findPrevious)
- - Alt-g: [`gotoLine`](https://codemirror.net/6/docs/ref/#search.gotoLine)
+ - Mod-Alt-g: [`gotoLine`](https://codemirror.net/6/docs/ref/#search.gotoLine)
  - Mod-d: [`selectNextOccurrence`](https://codemirror.net/6/docs/ref/#search.selectNextOccurrence)
 */
 const searchKeymap = [
@@ -1061,7 +1096,7 @@ const searchKeymap = [
     { key: "Mod-g", run: findNext, shift: findPrevious, scope: "editor search-panel", preventDefault: true },
     { key: "Escape", run: closeSearchPanel, scope: "editor search-panel" },
     { key: "Mod-Shift-l", run: selectSelectionMatches },
-    { key: "Alt-g", run: gotoLine },
+    { key: "Mod-Alt-g", run: gotoLine },
     { key: "Mod-d", run: selectNextOccurrence, preventDefault: true },
 ];
 class SearchPanel {

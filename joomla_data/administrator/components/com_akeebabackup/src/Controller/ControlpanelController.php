@@ -49,7 +49,7 @@ class ControlpanelController extends BaseController
 	 */
 	protected $default_view = 'Controlpanel';
 
-	public function __construct($config = [], MVCFactoryInterface $factory = null, ?CMSApplication $app = null, ?Input $input = null)
+	public function __construct($config = [], ?MVCFactoryInterface $factory = null, ?CMSApplication $app = null, ?Input $input = null)
 	{
 		parent::__construct($config, $factory, $app, $input);
 

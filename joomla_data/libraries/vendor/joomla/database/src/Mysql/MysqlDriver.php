@@ -296,9 +296,10 @@ class MysqlDriver extends PdoDriver implements UTF8MB4SupportInterface
      */
     public function getAlterDbCharacterSet($dbName)
     {
-        $charset = $this->utf8mb4 ? 'utf8mb4' : 'utf8';
+        $charset   = $this->utf8mb4 ? 'utf8mb4' : 'utf8';
+        $collation = $charset . '_unicode_ci';
 
-        return 'ALTER DATABASE ' . $this->quoteName($dbName) . ' CHARACTER SET `' . $charset . '`';
+        return 'ALTER DATABASE ' . $this->quoteName($dbName) . ' CHARACTER SET `' . $charset . '` COLLATE `' . $collation . '`';
     }
 
     /**
@@ -486,8 +487,8 @@ class MysqlDriver extends PdoDriver implements UTF8MB4SupportInterface
     {
         $this->connect();
 
-        // Set the query to get the tables statement.
-        return $this->setQuery('SHOW TABLES')->loadColumn();
+        // Set the query to get the tables statement and not the views.
+        return $this->setQuery('SHOW FULL TABLES WHERE table_type="BASE TABLE"')->loadColumn();
     }
 
     /**

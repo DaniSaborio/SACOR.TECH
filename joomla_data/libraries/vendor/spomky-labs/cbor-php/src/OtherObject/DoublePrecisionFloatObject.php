@@ -8,8 +8,9 @@ use Brick\Math\BigInteger;
 use CBOR\Normalizable;
 use CBOR\OtherObject as Base;
 use CBOR\Utils;
-use const INF;
 use InvalidArgumentException;
+use function strlen;
+use const INF;
 use const NAN;
 
 final class DoublePrecisionFloatObject extends Base implements Normalizable
@@ -26,7 +27,7 @@ final class DoublePrecisionFloatObject extends Base implements Normalizable
 
     public static function create(string $value): self
     {
-        if (mb_strlen($value, '8bit') !== 8) {
+        if (strlen($value) !== 8) {
             throw new InvalidArgumentException('The value is not a valid double precision floating point');
         }
 
