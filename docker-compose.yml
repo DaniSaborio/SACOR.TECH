@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   joomla:
-    image: joomla:5.0
+    build: .
     ports:
       - "8080:80"
     environment:
@@ -15,6 +15,7 @@ services:
     volumes:
       - ./joomla_data:/var/www/html
       - ./custom.ini:/usr/local/etc/php/conf.d/custom.ini
+      - ./fileinfo.ini:/usr/local/etc/php/conf.d/fileinfo.ini
 
   db:
     image: mariadb:11
