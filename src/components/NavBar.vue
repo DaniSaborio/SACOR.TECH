@@ -1,4 +1,7 @@
 <script setup>
+import Game_Projects from './Game_Projects.vue';
+import General_Buttons from './General_Buttons.vue';
+
 defineProps({
     msg:{
         type: String,
@@ -13,6 +16,8 @@ defineProps({
         {{ msg }}
     </h1>
 </div>
+<General_Buttons class="services_btn" name_btn="Services"/>
+<Game_Projects class="projects_btn"/>
 </template>
 
 <style>
@@ -27,8 +32,22 @@ header {
   position: absolute;
   top: 50px;
   left: 20px;
-  width: 90%;
+  width: 98%;
+  height: 60px;
   background: #983790;
   border-radius: 10px;
+  text-align: left;
+}
+
+.services_btn {
+  position: absolute;
+  margin-top: -30px;
+  right: 98px;
+}
+
+.projects_btn{
+  position: absolute;
+  margin-top: -75px;
+  right: 10px;
 }
 </style>

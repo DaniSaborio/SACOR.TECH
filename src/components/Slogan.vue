@@ -1,17 +1,26 @@
+
+
+<script setup>
+import { ref } from 'vue'
+const name_company = ref ("Sacor.Tech")
+const slogan = ref ("Alma en cada byte")
+const introduction = ref ("Buscamos ofrecerte desde desarrollo web, mantenimiento de equipos de computo hasta soluciones IOT para tu causa ")
+</script>
+
 <template> 
     <div class="block">
-        <h1>Sacor.tech</h1>
-        <h2>Alma en cada byte</h2>
-        <p>Buscamos ofrecerte desde desarrollo web, mantenimiento de equipos de computo hasta soluciones IOT para tu causa </p>
+        <h1>{{name_company}}</h1>
+        <h2>{{ slogan }}</h2>
+        <p>{{ introduction }}</p>
     </div>
 </template>
 
 <style>
 .block{
-    text-align: left;
-    position: absolute;
+    text-align: center;
+    position: absolute ;
     top: 100px;
-    left: 20px;
+  
 }
 </style>
 
